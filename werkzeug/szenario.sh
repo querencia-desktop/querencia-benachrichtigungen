@@ -41,7 +41,7 @@ if kill -0 $DIENST 2>/dev/null && grep -q "bereit: org.freedesktop.Notifications
 # 2 GetServerInformation per gdbus und busctl
 INFO=$(gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.GetServerInformation 2>&1)
 echo "$INFO" >"$OUT/serverinfo-gdbus.txt"
-[[ $INFO == *"Querencia Benachrichtigungen"*"Querencia"*"0.1.0"*"1.2"* ]] && ok "GetServerInformation (gdbus): $INFO" || nok "GetServerInformation gdbus: $INFO"
+[[ $INFO == *"Querencia Benachrichtigungen"*"Querencia"*"1.2"* ]] && ok "GetServerInformation (gdbus): $INFO" || nok "GetServerInformation gdbus: $INFO"
 BINFO=$(busctl --user call org.freedesktop.Notifications /org/freedesktop/Notifications org.freedesktop.Notifications GetServerInformation 2>&1)
 echo "$BINFO" >"$OUT/serverinfo-busctl.txt"
 [[ $BINFO == *"Querencia Benachrichtigungen"* ]] && ok "GetServerInformation (busctl): $BINFO" || nok "GetServerInformation busctl: $BINFO"

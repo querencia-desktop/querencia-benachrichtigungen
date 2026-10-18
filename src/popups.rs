@@ -359,8 +359,10 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
     betreff.set_xalign(0.0);
     betreff.set_hexpand(true);
     betreff.set_wrap(true);
+    // WordChar bricht Wörter ohne Leerzeichen hart um; 2 Zeilen, dann Ellipse.
     betreff.set_wrap_mode(gtk4::pango::WrapMode::WordChar);
-    betreff.set_max_width_chars(30);
+    betreff.set_width_chars(10);
+    betreff.set_max_width_chars(26);
     betreff.set_lines(2);
     betreff.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     kopf.append(&betreff);
@@ -379,8 +381,15 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
         text.set_xalign(0.0);
         text.set_wrap(true);
         text.set_wrap_mode(gtk4::pango::WrapMode::WordChar);
-        text.set_max_width_chars(34);
-        text.set_lines(8);
+        text.set_width_chars(10);
+        text.set_max_width_chars(30);
+        // Höchstens 5 Zeilen (3 mit Aktionsknöpfen), damit der Kasten unter
+        // etwa 160 px bleibt; der Rest wird mit Ellipse abgeschnitten.
+        text.set_lines(if m.knopf_aktionen().next().is_some() {
+            3
+        } else {
+            5
+        });
         text.set_ellipsize(gtk4::pango::EllipsizeMode::End);
         text.set_selectable(false);
         let markup = markup::bereinige(&m.body);
@@ -396,6 +405,8 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
         let app = gtk4::Label::new(Some(&m.app_name));
         app.add_css_class("qb-app");
         app.set_xalign(0.0);
+        app.set_width_chars(10);
+        app.set_max_width_chars(30);
         app.set_ellipsize(gtk4::pango::EllipsizeMode::End);
         inhalt.append(&app);
     }

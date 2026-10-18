@@ -9,7 +9,7 @@ PROFIL=$E/gui-test/profil
 [ -d "$E/gui-test" ] && [ "$(dirname "$PROFIL")" = "$E/gui-test" ] && rm -rf "$PROFIL"
 mkdir -p "$PROFIL/data/applications" "$E/nachweis/gui" "$E/laufzeit"
 ART=${2:-debug}
-BIN=$E/target/$ART/querencia-benachrichtigungen
+BIN=${QB_BIN:-$E/target/$ART/querencia-benachrichtigungen}
 ATTRAPPE=$E/target/$ART/panel-attrappe
 [ -x "$BIN" ] || { echo "fehlt: $BIN (erst cargo build)"; exit 2; }
 [ -x "$ATTRAPPE" ] || { echo "fehlt: $ATTRAPPE (erst cargo build --all-targets)"; exit 2; }

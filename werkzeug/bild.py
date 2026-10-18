@@ -4,6 +4,7 @@
   bild.py <png> groesse                 -> "B H"
   bild.py <png> pixel X Y               -> "R G B"
   bild.py <png> erste-helle-zeile X     -> y der ersten Zeile mit (fast) weißem Pixel in Spalte X, sonst -1
+  bild.py <png> letzte-helle-zeile X    -> y der letzten solchen Zeile
   bild.py <png> linke-kante Y           -> x der ersten nicht-hellen Spalte von rechts in Zeile Y
   bild.py <png> orange-rechts           -> Anzahl Pixel in Akzentfarbe (#F07746-nah) in den rechten 400 Spalten
 """
@@ -69,6 +70,14 @@ def main():
                 print(y)
                 return
         print(-1)
+    elif cmd == 'letzte-helle-zeile':
+        x = int(sys.argv[3])
+        letzte = -1
+        for y in range(h):
+            r, g, b = px(x, y)
+            if r > 240 and g > 240 and b > 240:
+                letzte = y
+        print(letzte)
     elif cmd == 'linke-kante':
         # Von rechts: erst den Rand (nicht hell) überspringen, dann den hellen
         # Kasten; die erste nicht-helle Spalte danach ist seine linke Kante.

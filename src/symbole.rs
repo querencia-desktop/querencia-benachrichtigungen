@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use gtk4::prelude::*;
-use gtk4::{gdk, glib};
+use gtk4::{gdk, gdk_pixbuf, glib};
 
 use crate::modell::{BildDaten, Dringlichkeit, Meldung};
 
@@ -86,15 +86,45 @@ fn aus_daten(b: &BildDaten) -> Option<gtk4::Widget> {
     if !b.plausibel() {
         return None;
     }
-    let format = if b.alpha {
-        gdk::MemoryFormat::R8g8b8a8
-    } else {
-        gdk::MemoryFormat::R8g8b8
-    };
+    // Über GdkPixbuf, damit das Bild vor der Anzeige auf GROESSE verkleinert
+    // wird: Electron/libnotify schicken das Programmsymbol oft als 256×256
+    // oder größer, und ein GtkPicture würde den Kasten darauf aufblasen.
     let bytes = glib::Bytes::from(&b.daten[..]);
-    let textur =
-        gdk::MemoryTexture::new(b.breite, b.hoehe, format, &bytes, b.zeilenlaenge as usize);
-    Some(bild(textur.upcast::<gdk::Paintable>()))
+    let pixbuf = gdk_pixbuf::Pixbuf::from_bytes(
+        &bytes,
+        gdk_pixbuf::Colorspace::Rgb,
+        b.alpha,
+        b.bits_je_kanal,
+        b.breite,
+        b.hoehe,
+        b.zeilenlaenge,
+    );
+    verkleinert(&pixbuf).map(bild)
+}
+
+/// Verkleinert auf höchstens GROESSE × GROESSE (Seitenverhältnis bleibt);
+/// kleinere Bilder bleiben, wie sie sind.
+fn verkleinert(pixbuf: &gdk_pixbuf::Pixbuf) -> Option<gdk::Paintable> {
+    let (b, h) = (pixbuf.width(), pixbuf.height());
+    if b <= 0 || h <= 0 {
+        return None;
+    }
+    let skaliert = if b > GROESSE || h > GROESSE {
+        let (zb, zh) = zielmasse(b, h, GROESSE);
+        pixbuf.scale_simple(zb, zh, gdk_pixbuf::InterpType::Bilinear)?
+    } else {
+        pixbuf.clone()
+    };
+    Some(gdk::Texture::for_pixbuf(&skaliert).upcast())
+}
+
+/// Zielmaße für ein Bild b×h, das in ein Quadrat `max` passen soll.
+pub fn zielmasse(b: i32, h: i32, max: i32) -> (i32, i32) {
+    if b >= h {
+        (max, (h as i64 * max as i64 / b as i64).max(1) as i32)
+    } else {
+        ((b as i64 * max as i64 / h as i64).max(1) as i32, max)
+    }
 }
 
 /// Pfad, `file://`-URI oder Themensymbolname.
@@ -104,9 +134,11 @@ fn aus_angabe(angabe: &str) -> Option<gtk4::Widget> {
         return None;
     }
     match pfad_aus_angabe(angabe) {
-        Some(pfad) => gdk::Texture::from_filename(&pfad)
+        // Beim Laden schon auf GROESSE begrenzen (auch große PNGs/SVGs).
+        Some(pfad) => gdk_pixbuf::Pixbuf::from_file_at_scale(&pfad, GROESSE, GROESSE, true)
             .ok()
-            .map(|t| bild(t.upcast())),
+            .and_then(|p| verkleinert(&p))
+            .map(bild),
         None => themensymbol(angabe),
     }
 }
@@ -194,6 +226,14 @@ fn symbol_aus_desktop_datei(pfad: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zielmasse_halten_das_seitenverhaeltnis() {
+        assert_eq!(zielmasse(512, 512, 48), (48, 48));
+        assert_eq!(zielmasse(256, 128, 48), (48, 24));
+        assert_eq!(zielmasse(100, 400, 48), (12, 48));
+        assert_eq!(zielmasse(4096, 1, 48), (48, 1));
+    }
 
     #[test]
     fn pfadangaben() {

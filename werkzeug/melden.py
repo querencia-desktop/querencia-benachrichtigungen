@@ -3,7 +3,7 @@
 dem Ubuntus AppArmor-Profil GetCapabilities verbietet).
 
   melden.py [-a schluessel=Beschriftung]... [-u low|normal|critical] [-t ms]
-            [-i symbol] [-r id] [--wait] BETREFF [TEXT]
+            [-i symbol] [-r id] [--bild BxH] [--wait] BETREFF [TEXT]
 
 Gibt die ID aus; mit --wait wartet er auf ActionInvoked oder
 NotificationClosed für diese ID und gibt den Aktionsschlüssel bzw.
@@ -16,7 +16,7 @@ gi.require_version('GLib', '2.0')
 from gi.repository import Gio, GLib
 
 args = sys.argv[1:]
-actions, urgency, timeout, icon, replaces, wait, pos = [], None, -1, "", 0, False, []
+actions, urgency, timeout, icon, replaces, wait, pos, bild = [], None, -1, "", 0, False, [], None
 while args:
     a = args.pop(0)
     if a == '-a':
@@ -32,6 +32,8 @@ while args:
         replaces = int(args.pop(0))
     elif a == '--wait':
         wait = True
+    elif a == '--bild':
+        bild = tuple(int(v) for v in args.pop(0).split('x'))
     else:
         pos.append(a)
 summary = pos[0] if pos else ""
@@ -39,6 +41,15 @@ body = pos[1] if len(pos) > 1 else ""
 hints = {}
 if urgency is not None:
     hints['urgency'] = GLib.Variant('y', urgency)
+if bild:
+    # Hint image-data (iiibiiay): RGBA-Testbild mit Farbverlauf und Rahmen.
+    w, h = bild
+    daten = bytearray()
+    for y in range(h):
+        for x in range(w):
+            rand = x < 8 or y < 8 or x >= w - 8 or y >= h - 8
+            daten += bytes((240 if rand else x * 255 // max(w - 1, 1), 119 if rand else y * 255 // max(h - 1, 1), 70 if rand else 128, 255))
+    hints['image-data'] = GLib.Variant('(iiibiiay)', (w, h, w * 4, True, 8, 4, bytes(daten)))
 
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 loop = GLib.MainLoop()
