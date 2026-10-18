@@ -1,0 +1,34 @@
+[package]
+name = "querencia-benachrichtigungen"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92"
+description = "Querencia Benachrichtigungen: Dienst für Desktop-Benachrichtigungen (org.freedesktop.Notifications) mit Popups über gtk4-layer-shell"
+license = "GPL-3.0-or-later"
+publish = false
+default-run = "querencia-benachrichtigungen"
+
+[[bin]]
+name = "querencia-benachrichtigungen"
+path = "src/main.rs"
+
+# Nur für die isolierte Prüfung: ein oberes Panel mit Exklusivzone.
+[[bin]]
+name = "panel-attrappe"
+path = "src/bin/panel-attrappe.rs"
+
+[dependencies]
+# Dieselben Bindings wie Panel und Editor (gtk-rs 0.11 / GTK 4.22 installiert).
+gtk4 = { version = "0.11", features = ["v4_12"] }
+gtk4-layer-shell = "0.8.1"
+# D-Bus wie Querencia Files: zbus 5 mit async-io, ohne tokio.
+zbus = { version = "5.19", default-features = false, features = ["async-io"] }
+serde = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+[lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
