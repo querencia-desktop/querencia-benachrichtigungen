@@ -17,30 +17,43 @@ pub fn widget(m: &Meldung) -> gtk4::Widget {
     if let Some(w) = m.bild_daten.as_ref().and_then(aus_daten) {
         return w;
     }
-    for angabe in [m.bild_pfad.as_deref(), Some(m.app_icon.as_str())].into_iter().flatten() {
+    for angabe in [m.bild_pfad.as_deref(), Some(m.app_icon.as_str())]
+        .into_iter()
+        .flatten()
+    {
         if let Some(w) = aus_angabe(angabe) {
             return w;
         }
     }
-    if let Some(name) = m.desktop_entry.as_deref().and_then(|id| desktop_symbol(id, &datenverzeichnisse())) {
-        if let Some(w) = aus_angabe(&name) {
-            return w;
-        }
+    if let Some(w) = m
+        .desktop_entry
+        .as_deref()
+        .and_then(|id| desktop_symbol(id, &datenverzeichnisse()))
+        .and_then(|name| aus_angabe(&name))
+    {
+        return w;
     }
     let name = match m.dringlichkeit {
         Dringlichkeit::Kritisch => "dialog-warning",
         _ => "dialog-information",
     };
-    themensymbol(name).unwrap_or_else(|| themensymbol("image-missing").unwrap_or_else(|| gtk4::Image::new().upcast()))
+    themensymbol(name).unwrap_or_else(|| {
+        themensymbol("image-missing").unwrap_or_else(|| gtk4::Image::new().upcast())
+    })
 }
 
 fn aus_daten(b: &BildDaten) -> Option<gtk4::Widget> {
     if !b.plausibel() {
         return None;
     }
-    let format = if b.alpha { gdk::MemoryFormat::R8g8b8a8 } else { gdk::MemoryFormat::R8g8b8 };
+    let format = if b.alpha {
+        gdk::MemoryFormat::R8g8b8a8
+    } else {
+        gdk::MemoryFormat::R8g8b8
+    };
     let bytes = glib::Bytes::from(&b.daten[..]);
-    let textur = gdk::MemoryTexture::new(b.breite, b.hoehe, format, &bytes, b.zeilenlaenge as usize);
+    let textur =
+        gdk::MemoryTexture::new(b.breite, b.hoehe, format, &bytes, b.zeilenlaenge as usize);
     Some(bild(textur.upcast::<gdk::Paintable>()))
 }
 
@@ -51,7 +64,9 @@ fn aus_angabe(angabe: &str) -> Option<gtk4::Widget> {
         return None;
     }
     match pfad_aus_angabe(angabe) {
-        Some(pfad) => gdk::Texture::from_filename(&pfad).ok().map(|t| bild(t.upcast())),
+        Some(pfad) => gdk::Texture::from_filename(&pfad)
+            .ok()
+            .map(|t| bild(t.upcast())),
         None => themensymbol(angabe),
     }
 }
@@ -80,7 +95,10 @@ fn themensymbol(name: &str) -> Option<gtk4::Widget> {
     let display = gdk::Display::default()?;
     let thema = gtk4::IconTheme::for_display(&display);
     // Ein Name mit Endung (`foo.png`, von notify-send -i) wird ohne Endung gesucht.
-    let name = name.strip_suffix(".png").or_else(|| name.strip_suffix(".svg")).unwrap_or(name);
+    let name = name
+        .strip_suffix(".png")
+        .or_else(|| name.strip_suffix(".svg"))
+        .unwrap_or(name);
     if !thema.has_icon(name) {
         return None;
     }
@@ -115,8 +133,14 @@ pub fn desktop_symbol(id: &str, verzeichnisse: &[PathBuf]) -> Option<String> {
     if id.is_empty() || id.contains('/') || id.contains("..") {
         return None;
     }
-    let datei = if id.ends_with(".desktop") { id.to_string() } else { format!("{id}.desktop") };
-    verzeichnisse.iter().find_map(|v| symbol_aus_desktop_datei(&v.join("applications").join(&datei)))
+    let datei = if id.ends_with(".desktop") {
+        id.to_string()
+    } else {
+        format!("{id}.desktop")
+    };
+    verzeichnisse
+        .iter()
+        .find_map(|v| symbol_aus_desktop_datei(&v.join("applications").join(&datei)))
 }
 
 fn symbol_aus_desktop_datei(pfad: &Path) -> Option<String> {
@@ -133,11 +157,20 @@ mod tests {
 
     #[test]
     fn pfadangaben() {
-        assert_eq!(pfad_aus_angabe("/usr/share/x.png"), Some(PathBuf::from("/usr/share/x.png")));
-        assert_eq!(pfad_aus_angabe("file:///tmp/a%20b.png"), Some(PathBuf::from("/tmp/a b.png")));
+        assert_eq!(
+            pfad_aus_angabe("/usr/share/x.png"),
+            Some(PathBuf::from("/usr/share/x.png"))
+        );
+        assert_eq!(
+            pfad_aus_angabe("file:///tmp/a%20b.png"),
+            Some(PathBuf::from("/tmp/a b.png"))
+        );
         assert_eq!(pfad_aus_angabe("dialog-information"), None);
         assert_eq!(pfad_aus_angabe("org.querencia.Editor"), None);
-        assert_eq!(pfad_aus_angabe("~/bild.png"), Some(glib::home_dir().join("bild.png")));
+        assert_eq!(
+            pfad_aus_angabe("~/bild.png"),
+            Some(glib::home_dir().join("bild.png"))
+        );
     }
 
     #[test]
@@ -150,10 +183,20 @@ mod tests {
             "[Desktop Entry]\nType=Application\nName=Probe\nIcon=  probe-symbol \nExec=true\n",
         )
         .unwrap();
-        std::fs::write(apps.join("ohne.desktop"), "[Desktop Entry]\nType=Application\nName=Ohne\nExec=true\n").unwrap();
+        std::fs::write(
+            apps.join("ohne.desktop"),
+            "[Desktop Entry]\nType=Application\nName=Ohne\nExec=true\n",
+        )
+        .unwrap();
         let v = vec![PathBuf::from("/nirgends"), dir.clone()];
-        assert_eq!(desktop_symbol("org.test.Probe", &v).as_deref(), Some("probe-symbol"));
-        assert_eq!(desktop_symbol("org.test.Probe.desktop", &v).as_deref(), Some("probe-symbol"));
+        assert_eq!(
+            desktop_symbol("org.test.Probe", &v).as_deref(),
+            Some("probe-symbol")
+        );
+        assert_eq!(
+            desktop_symbol("org.test.Probe.desktop", &v).as_deref(),
+            Some("probe-symbol")
+        );
         assert_eq!(desktop_symbol("ohne", &v), None);
         assert_eq!(desktop_symbol("fehlt", &v), None);
         assert_eq!(desktop_symbol("../etc/passwd", &v), None);

@@ -70,13 +70,16 @@ def main():
                 return
         print(-1)
     elif cmd == 'linke-kante':
+        # Von rechts: erst den Rand (nicht hell) überspringen, dann den hellen
+        # Kasten; die erste nicht-helle Spalte danach ist seine linke Kante.
         y = int(sys.argv[3])
-        for x in range(w - 1, -1, -1):
-            r, g, b = px(x, y)
-            if not (r > 200 and g > 200 and b > 200):
-                print(x)
-                return
-        print(-1)
+        hell = lambda x: all(c > 200 for c in px(x, y))
+        x = w - 1
+        while x >= 0 and not hell(x):
+            x -= 1
+        while x >= 0 and hell(x):
+            x -= 1
+        print(x)
     elif cmd == 'orange-rechts':
         n = 0
         for y in range(h):

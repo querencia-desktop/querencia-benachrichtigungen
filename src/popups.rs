@@ -47,9 +47,21 @@ thread_local! {
     static DIENST: RefCell<Option<Dienst>> = const { RefCell::new(None) };
 }
 
-/// Führt `f` mit dem Dienst des GTK-Threads aus (nach `einrichten`).
+/// Führt `f` mit dem Dienst des GTK-Threads aus (nach `einrichten`). Ist der
+/// Dienst gerade in Arbeit (GTK ruft z. B. beim Entfernen eines Kastens
+/// synchron `leave` auf), kommt `None` zurück und nichts geschieht.
 pub fn mit_dienst<R>(f: impl FnOnce(&mut Dienst) -> R) -> Option<R> {
-    DIENST.with(|d| d.borrow_mut().as_mut().map(f))
+    DIENST.with(|d| d.try_borrow_mut().ok().and_then(|mut d| d.as_mut().map(f)))
+}
+
+/// Führt `f` im nächsten Leerlauf des GTK-Hauptkreises aus, also außerhalb
+/// jedes laufenden Signal-Handlers. Für Klicks, Knöpfe und Zeitgeber.
+fn spaeter(f: impl FnOnce(&mut Dienst) + 'static) {
+    glib::idle_add_local_once(move || {
+        if mit_dienst(f).is_none() {
+            dbus::log("Dienst nicht erreichbar (interner Fehler)");
+        }
+    });
 }
 
 pub fn einrichten(conn: Connection, zustand: Arc<Mutex<Zustand>>) -> Result<(), String> {
@@ -80,12 +92,21 @@ impl Dienst {
         let display = gdk::Display::default().ok_or("kein Display")?;
         let css = gtk4::CssProvider::new();
         css.load_from_string(CSS);
-        gtk4::style_context_add_provider_for_display(&display, &css, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        gtk4::style_context_add_provider_for_display(
+            &display,
+            &css,
+            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
 
         let spalte = gtk4::Box::new(gtk4::Orientation::Vertical, 8);
         spalte.set_margin_top(8);
         spalte.set_margin_end(8);
-        let fenster = gtk4::Window::builder().title("Querencia Benachrichtigungen").child(&spalte).decorated(false).resizable(false).build();
+        let fenster = gtk4::Window::builder()
+            .title("Querencia Benachrichtigungen")
+            .child(&spalte)
+            .decorated(false)
+            .resizable(false)
+            .build();
         fenster.add_css_class("qb-stapel");
         fenster.init_layer_shell();
         fenster.set_namespace(Some(NAMESPACE));
@@ -97,7 +118,14 @@ impl Dienst {
         fenster.set_anchor(Edge::Left, false);
         // 0: der Compositor rückt das Fenster aus fremden Exklusivzonen (Panel) heraus.
         fenster.set_exclusive_zone(0);
-        Ok(Self { conn, zustand, fenster, spalte, sichtbar: Vec::new(), wartend: VecDeque::new() })
+        Ok(Self {
+            conn,
+            zustand,
+            fenster,
+            spalte,
+            sichtbar: Vec::new(),
+            wartend: VecDeque::new(),
+        })
     }
 
     fn emitter(&self) -> Option<SignalEmitter<'static>> {
@@ -105,18 +133,20 @@ impl Dienst {
     }
 
     fn signal_geschlossen(&self, id: u32, grund: u32) {
-        if let Some(e) = self.emitter() {
-            if let Err(err) = zbus::block_on(Notifications::notification_closed(&e, id, grund)) {
-                dbus::log(&format!("NotificationClosed({id}) nicht gesendet: {err}"));
-            }
+        let Some(e) = self.emitter() else { return };
+        if let Err(err) = zbus::block_on(Notifications::notification_closed(&e, id, grund)) {
+            dbus::log(&format!("NotificationClosed({id}) nicht gesendet: {err}"));
         }
     }
 
     fn signal_aktion(&self, id: u32, schluessel: &str) {
-        if let Some(e) = self.emitter() {
-            if let Err(err) = zbus::block_on(Notifications::action_invoked(&e, id, schluessel.to_string())) {
-                dbus::log(&format!("ActionInvoked({id}) nicht gesendet: {err}"));
-            }
+        let Some(e) = self.emitter() else { return };
+        if let Err(err) = zbus::block_on(Notifications::action_invoked(
+            &e,
+            id,
+            schluessel.to_string(),
+        )) {
+            dbus::log(&format!("ActionInvoked({id}) nicht gesendet: {err}"));
         }
     }
 
@@ -147,7 +177,10 @@ impl Dienst {
             alt.ueberfahren = false;
             self.timer_stoppen(index);
             self.timer_starten(index);
-            dbus::log(&format!("Meldung {id} ersetzt: „{}“", self.sichtbar[index].meldung.summary));
+            dbus::log(&format!(
+                "Meldung {id} ersetzt: „{}“",
+                self.sichtbar[index].meldung.summary
+            ));
             self.zaehler_melden();
             return;
         }
@@ -157,7 +190,10 @@ impl Dienst {
             return;
         }
         if self.sichtbar.len() >= MAX_SICHTBAR {
-            dbus::log(&format!("Meldung {id} wartet ({} sichtbar)", self.sichtbar.len()));
+            dbus::log(&format!(
+                "Meldung {id} wartet ({} sichtbar)",
+                self.sichtbar.len()
+            ));
             self.wartend.push_back(meldung);
             self.zaehler_melden();
             return;
@@ -170,13 +206,23 @@ impl Dienst {
         let kasten = baue_kasten(&meldung);
         self.spalte.append(&kasten);
         dbus::log(&format!(
-            "Meldung {} von „{}“ ({}): „{}“",
+            "Meldung {} von „{}“ ({}{}): „{}“",
             meldung.id,
             meldung.app_name,
             meldung.dringlichkeit.name(),
+            meldung
+                .category
+                .as_deref()
+                .map(|c| format!(", {c}"))
+                .unwrap_or_default(),
             meldung.summary
         ));
-        self.sichtbar.push(Popup { meldung, kasten, timer: None, ueberfahren: false });
+        self.sichtbar.push(Popup {
+            meldung,
+            kasten,
+            timer: None,
+            ueberfahren: false,
+        });
         let index = self.sichtbar.len() - 1;
         self.timer_starten(index);
         if !self.fenster.is_visible() {
@@ -185,14 +231,18 @@ impl Dienst {
     }
 
     fn timer_starten(&mut self, index: usize) {
-        let Some(p) = self.sichtbar.get_mut(index) else { return };
+        let Some(p) = self.sichtbar.get_mut(index) else {
+            return;
+        };
         if p.ueberfahren || p.timer.is_some() {
             return;
         }
-        let Some(dauer) = p.meldung.anzeigedauer() else { return };
+        let Some(dauer) = p.meldung.anzeigedauer() else {
+            return;
+        };
         let id = p.meldung.id;
         p.timer = Some(glib::timeout_add_local_once(dauer, move || {
-            mit_dienst(|d| {
+            spaeter(move |d| {
                 if let Some(p) = d.sichtbar.iter_mut().find(|p| p.meldung.id == id) {
                     p.timer = None;
                 }
@@ -208,7 +258,9 @@ impl Dienst {
     }
 
     fn ueberfahren(&mut self, id: u32, drin: bool) {
-        let Some(index) = self.sichtbar.iter().position(|p| p.meldung.id == id) else { return };
+        let Some(index) = self.sichtbar.iter().position(|p| p.meldung.id == id) else {
+            return;
+        };
         self.sichtbar[index].ueberfahren = drin;
         if drin {
             self.timer_stoppen(index);
@@ -232,7 +284,11 @@ impl Dienst {
         if !gefunden {
             return;
         }
-        self.zustand.lock().unwrap_or_else(|e| e.into_inner()).aktiv.remove(&id);
+        self.zustand
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .aktiv
+            .remove(&id);
         dbus::log(&format!("Meldung {id} geschlossen (Grund {grund})"));
         self.signal_geschlossen(id, grund);
         self.nachruecken();
@@ -244,13 +300,17 @@ impl Dienst {
 
     fn nachruecken(&mut self) {
         while self.sichtbar.len() < MAX_SICHTBAR {
-            let Some(m) = self.wartend.pop_front() else { break };
+            let Some(m) = self.wartend.pop_front() else {
+                break;
+            };
             self.anzeigen(m);
         }
     }
 
     fn aktion(&mut self, id: u32, schluessel: &str) {
-        let Some(p) = self.sichtbar.iter().find(|p| p.meldung.id == id) else { return };
+        let Some(p) = self.sichtbar.iter().find(|p| p.meldung.id == id) else {
+            return;
+        };
         let resident = p.meldung.resident;
         dbus::log(&format!("Meldung {id}: Aktion „{schluessel}“"));
         self.signal_aktion(id, schluessel);
@@ -261,7 +321,9 @@ impl Dienst {
 
     /// Klick auf den Kasten: Default-Aktion, sonst schließen.
     fn klick(&mut self, id: u32) {
-        let Some(p) = self.sichtbar.iter().find(|p| p.meldung.id == id) else { return };
+        let Some(p) = self.sichtbar.iter().find(|p| p.meldung.id == id) else {
+            return;
+        };
         if p.meldung.hat_default_aktion() {
             self.aktion(id, "default");
         } else {
@@ -287,7 +349,11 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
     inhalt.set_size_request(BREITE - symbole::GROESSE - 40, -1);
 
     let kopf = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
-    let betreff = gtk4::Label::new(Some(if m.summary.is_empty() { &m.app_name } else { &m.summary }));
+    let betreff = gtk4::Label::new(Some(if m.summary.is_empty() {
+        &m.app_name
+    } else {
+        &m.summary
+    }));
     betreff.add_css_class("qb-betreff");
     betreff.set_xalign(0.0);
     betreff.set_hexpand(true);
@@ -302,9 +368,7 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
     schliessen.set_valign(gtk4::Align::Start);
     schliessen.set_tooltip_text(Some("Schließen"));
     schliessen.set_can_focus(false);
-    schliessen.connect_clicked(move |_| {
-        mit_dienst(|d| d.schliesse(id, grund::GESCHLOSSEN));
-    });
+    schliessen.connect_clicked(move |_| spaeter(move |d| d.schliesse(id, grund::GESCHLOSSEN)));
     kopf.append(&schliessen);
     inhalt.append(&kopf);
 
@@ -319,7 +383,7 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
         text.set_ellipsize(gtk4::pango::EllipsizeMode::End);
         text.set_selectable(false);
         let markup = markup::bereinige(&m.body);
-        if gtk4::pango::parse_markup(&markup, '\0').is_ok() {
+        if gtk4::pango::parse_markup(&markup::pango_pruefbar(&markup), '\0').is_ok() {
             text.set_markup(&markup);
         } else {
             text.set_text(&m.body);
@@ -346,7 +410,8 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
             knopf.set_can_focus(false);
             let schluessel = schluessel.clone();
             knopf.connect_clicked(move |_| {
-                mit_dienst(|d| d.aktion(id, &schluessel));
+                let schluessel = schluessel.clone();
+                spaeter(move |d| d.aktion(id, &schluessel));
             });
             reihe.append(&knopf);
         }
@@ -364,15 +429,23 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
     });
     kasten.add_controller(bewegung);
 
-    // Klick auf die Meldung selbst (nicht auf Knöpfe): Default-Aktion.
+    // Klick auf die Meldung selbst: Default-Aktion. Knöpfe (Schließen,
+    // Aktionen) behandeln ihren Klick selbst und werden hier übersprungen.
     let klick = gtk4::GestureClick::new();
     klick.set_button(gdk::BUTTON_PRIMARY);
     klick.set_propagation_phase(gtk4::PropagationPhase::Bubble);
-    klick.connect_released(move |geste, _, _, _| {
+    klick.connect_released(move |geste, _, x, y| {
+        let auf_knopf = geste
+            .widget()
+            .and_then(|w| w.pick(x, y, gtk4::PickFlags::DEFAULT))
+            .is_some_and(|w| {
+                w.is::<gtk4::Button>() || w.ancestor(gtk4::Button::static_type()).is_some()
+            });
+        if auf_knopf {
+            return;
+        }
         geste.set_state(gtk4::EventSequenceState::Claimed);
-        glib::idle_add_local_once(move || {
-            mit_dienst(|d| d.klick(id));
-        });
+        spaeter(move |d| d.klick(id));
     });
     kasten.add_controller(klick);
     kasten

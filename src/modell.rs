@@ -58,14 +58,20 @@ pub struct BildDaten {
 impl BildDaten {
     /// Prüft, ob die Maße zum Puffer passen und GTK sie darstellen kann.
     pub fn plausibel(&self) -> bool {
-        if self.bits_je_kanal != 8 || self.breite <= 0 || self.hoehe <= 0 || self.breite > 4096 || self.hoehe > 4096 {
+        if self.bits_je_kanal != 8
+            || self.breite <= 0
+            || self.hoehe <= 0
+            || self.breite > 4096
+            || self.hoehe > 4096
+        {
             return false;
         }
         let kanaele = if self.alpha { 4 } else { 3 };
         if self.kanaele != kanaele || self.zeilenlaenge < self.breite * kanaele {
             return false;
         }
-        let noetig = (self.hoehe as usize - 1) * self.zeilenlaenge as usize + (self.breite * kanaele) as usize;
+        let noetig = (self.hoehe as usize - 1) * self.zeilenlaenge as usize
+            + (self.breite * kanaele) as usize;
         self.daten.len() >= noetig
     }
 }
@@ -94,6 +100,7 @@ pub struct Meldung {
 
 impl Meldung {
     /// Baut die Meldung aus den `Notify`-Argumenten.
+    #[allow(clippy::too_many_arguments)]
     pub fn neu(
         id: u32,
         app_name: String,
@@ -178,10 +185,12 @@ fn hint_dringlichkeit(hints: &HashMap<String, OwnedValue>) -> Dringlichkeit {
 }
 
 fn hint_string(hints: &HashMap<String, OwnedValue>, namen: &[&str]) -> Option<String> {
-    namen.iter().find_map(|n| match hints.get(*n).map(|v| &**v) {
-        Some(Value::Str(s)) if !s.is_empty() => Some(s.to_string()),
-        _ => None,
-    })
+    namen
+        .iter()
+        .find_map(|n| match hints.get(*n).map(|v| &**v) {
+            Some(Value::Str(s)) if !s.is_empty() => Some(s.to_string()),
+            _ => None,
+        })
 }
 
 fn hint_bool(hints: &HashMap<String, OwnedValue>, name: &str) -> bool {
@@ -212,7 +221,9 @@ fn bild_aus_wert(v: &Value<'_>) -> Option<BildDaten> {
         Value::I32(n) => Some(*n),
         _ => None,
     };
-    let Value::Bool(alpha) = &f[3] else { return None };
+    let Value::Bool(alpha) = &f[3] else {
+        return None;
+    };
     let Value::Array(a) = &f[6] else { return None };
     let mut daten = Vec::with_capacity(a.len());
     for e in a.iter() {
@@ -305,6 +316,7 @@ impl Verlauf {
         self.eintraege.len()
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.eintraege.is_empty()
     }
@@ -358,7 +370,10 @@ impl Zustand {
         self.nicht_stoeren = an;
         if let Some(p) = &self.nicht_stoeren_datei {
             let ergebnis = if an {
-                p.parent().map(std::fs::create_dir_all).transpose().and_then(|_| std::fs::write(p, b"an\n"))
+                p.parent()
+                    .map(std::fs::create_dir_all)
+                    .transpose()
+                    .and_then(|_| std::fs::write(p, b"an\n"))
             } else {
                 match std::fs::remove_file(p) {
                     Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
@@ -366,7 +381,10 @@ impl Zustand {
                 }
             };
             if let Err(e) = ergebnis {
-                eprintln!("querencia-benachrichtigungen: Nicht-stören-Zustand nicht gespeichert ({}): {e}", p.display());
+                eprintln!(
+                    "querencia-benachrichtigungen: Nicht-stören-Zustand nicht gespeichert ({}): {e}",
+                    p.display()
+                );
             }
         }
         true
@@ -385,26 +403,64 @@ mod tests {
     use super::*;
     use zbus::zvariant::{Array, Structure, StructureBuilder};
 
+    fn ov<T: Into<Value<'static>>>(t: T) -> OwnedValue {
+        OwnedValue::try_from(t.into()).expect("OwnedValue")
+    }
+
     fn meldung(id: u32, dringlichkeit: Dringlichkeit, timeout: i32) -> Meldung {
         let mut hints = HashMap::new();
-        hints.insert("urgency".to_string(), OwnedValue::from(dringlichkeit.als_byte()));
-        Meldung::neu(id, "app".into(), String::new(), format!("Betreff {id}"), "Text".into(), vec![], &hints, timeout, 1_000 + id as i64)
+        hints.insert("urgency".to_string(), ov(dringlichkeit.als_byte()));
+        Meldung::neu(
+            id,
+            "app".into(),
+            String::new(),
+            format!("Betreff {id}"),
+            "Text".into(),
+            vec![],
+            &hints,
+            timeout,
+            1_000 + id as i64,
+        )
     }
 
     #[test]
     fn anzeigedauer_standardwerte() {
-        assert_eq!(anzeigedauer(Dringlichkeit::Normal, -1), Some(Duration::from_secs(5)));
-        assert_eq!(anzeigedauer(Dringlichkeit::Niedrig, -1), Some(Duration::from_secs(3)));
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Normal, -1),
+            Some(Duration::from_secs(5))
+        );
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Niedrig, -1),
+            Some(Duration::from_secs(3))
+        );
         assert_eq!(anzeigedauer(Dringlichkeit::Kritisch, -1), None);
     }
 
     #[test]
     fn anzeigedauer_explizit() {
-        assert_eq!(anzeigedauer(Dringlichkeit::Normal, 1500), Some(Duration::from_millis(1500)));
-        assert_eq!(anzeigedauer(Dringlichkeit::Niedrig, 10_000), Some(Duration::from_secs(10)));
-        assert_eq!(anzeigedauer(Dringlichkeit::Normal, 0), None, "0 = nie ablaufen");
-        assert_eq!(anzeigedauer(Dringlichkeit::Kritisch, 2000), None, "kritisch bleibt stehen");
-        assert_eq!(anzeigedauer(Dringlichkeit::Normal, -7), Some(Duration::from_secs(5)), "negativ = Standard");
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Normal, 1500),
+            Some(Duration::from_millis(1500))
+        );
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Niedrig, 10_000),
+            Some(Duration::from_secs(10))
+        );
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Normal, 0),
+            None,
+            "0 = nie ablaufen"
+        );
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Kritisch, 2000),
+            None,
+            "kritisch bleibt stehen"
+        );
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Normal, -7),
+            Some(Duration::from_secs(5)),
+            "negativ = Standard"
+        );
     }
 
     #[test]
@@ -416,7 +472,7 @@ mod tests {
             (OwnedValue::from(2u32), Dringlichkeit::Kritisch),
             (OwnedValue::from(2i32), Dringlichkeit::Kritisch),
             (OwnedValue::from(9u8), Dringlichkeit::Normal),
-            (OwnedValue::from("kritisch"), Dringlichkeit::Normal),
+            (ov("kritisch"), Dringlichkeit::Normal),
         ] {
             let mut hints = HashMap::new();
             hints.insert("urgency".to_string(), wert);
@@ -428,11 +484,21 @@ mod tests {
     #[test]
     fn hints_strings_und_bools() {
         let mut hints = HashMap::new();
-        hints.insert("image-path".to_string(), OwnedValue::from("/tmp/x.png"));
-        hints.insert("desktop-entry".to_string(), OwnedValue::from("org.querencia.Editor"));
+        hints.insert("image-path".to_string(), ov("/tmp/x.png"));
+        hints.insert("desktop-entry".to_string(), ov("org.querencia.Editor"));
         hints.insert("transient".to_string(), OwnedValue::from(true));
-        hints.insert("category".to_string(), OwnedValue::from("email.arrived"));
-        let m = Meldung::neu(1, "a".into(), "".into(), "s".into(), "b".into(), vec![], &hints, -1, 0);
+        hints.insert("category".to_string(), ov("email.arrived"));
+        let m = Meldung::neu(
+            1,
+            "a".into(),
+            "".into(),
+            "s".into(),
+            "b".into(),
+            vec![],
+            &hints,
+            -1,
+            0,
+        );
         assert_eq!(m.bild_pfad.as_deref(), Some("/tmp/x.png"));
         assert_eq!(m.desktop_entry.as_deref(), Some("org.querencia.Editor"));
         assert!(m.transient);
@@ -440,7 +506,15 @@ mod tests {
         assert_eq!(m.category.as_deref(), Some("email.arrived"));
     }
 
-    fn bildwert(b: i32, h: i32, zl: i32, alpha: bool, bps: i32, kan: i32, daten: Vec<u8>) -> OwnedValue {
+    fn bildwert(
+        b: i32,
+        h: i32,
+        zl: i32,
+        alpha: bool,
+        bps: i32,
+        kan: i32,
+        daten: Vec<u8>,
+    ) -> OwnedValue {
         let s: Structure = StructureBuilder::new()
             .add_field(b)
             .add_field(h)
@@ -457,28 +531,55 @@ mod tests {
     #[test]
     fn bilddaten_werden_gelesen_und_geprueft() {
         let mut hints = HashMap::new();
-        hints.insert("image-data".to_string(), bildwert(2, 2, 8, true, 8, 4, vec![7; 16]));
+        hints.insert(
+            "image-data".to_string(),
+            bildwert(2, 2, 8, true, 8, 4, vec![7; 16]),
+        );
         let b = hint_bild(&hints).expect("Bild");
-        assert_eq!((b.breite, b.hoehe, b.zeilenlaenge, b.alpha, b.kanaele), (2, 2, 8, true, 4));
+        assert_eq!(
+            (b.breite, b.hoehe, b.zeilenlaenge, b.alpha, b.kanaele),
+            (2, 2, 8, true, 4)
+        );
         assert_eq!(b.daten.len(), 16);
         // zu kurzer Puffer
-        hints.insert("image-data".to_string(), bildwert(2, 2, 8, true, 8, 4, vec![7; 10]));
+        hints.insert(
+            "image-data".to_string(),
+            bildwert(2, 2, 8, true, 8, 4, vec![7; 10]),
+        );
         assert!(hint_bild(&hints).is_none());
         // 16 Bit je Kanal kann GTK so nicht
-        hints.insert("image-data".to_string(), bildwert(2, 2, 8, false, 16, 3, vec![7; 32]));
+        hints.insert(
+            "image-data".to_string(),
+            bildwert(2, 2, 8, false, 16, 3, vec![7; 32]),
+        );
         assert!(hint_bild(&hints).is_none());
         // alter Name
         hints.clear();
-        hints.insert("icon_data".to_string(), bildwert(1, 1, 3, false, 8, 3, vec![1, 2, 3]));
+        hints.insert(
+            "icon_data".to_string(),
+            bildwert(1, 1, 3, false, 8, 3, vec![1, 2, 3]),
+        );
         assert!(hint_bild(&hints).is_some());
     }
 
     #[test]
     fn aktionen_paare_und_default() {
         let m = Meldung::neu(
-            1, "a".into(), "".into(), "s".into(), "b".into(),
-            vec!["default".into(), "Öffnen".into(), "ja".into(), "Ja".into(), "einsam".into()],
-            &HashMap::new(), -1, 0,
+            1,
+            "a".into(),
+            "".into(),
+            "s".into(),
+            "b".into(),
+            vec![
+                "default".into(),
+                "Öffnen".into(),
+                "ja".into(),
+                "Ja".into(),
+                "einsam".into(),
+            ],
+            &HashMap::new(),
+            -1,
+            0,
         );
         assert_eq!(m.actions.len(), 2);
         assert!(m.hat_default_aktion());

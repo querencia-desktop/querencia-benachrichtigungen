@@ -54,6 +54,29 @@ pub fn bereinige(body: &str) -> String {
     aus
 }
 
+/// Pango selbst kennt `<a>` nicht; GtkLabel übersetzt es vor dem Parsen.
+/// Für eine Prüfung mit `pango::parse_markup` werden Links zu `<span>`.
+pub fn pango_pruefbar(markup: &str) -> String {
+    let mut aus = String::with_capacity(markup.len());
+    let mut rest = markup;
+    while let Some(p) = rest.find("<a href=\"") {
+        aus.push_str(&rest[..p]);
+        let nach = &rest[p..];
+        match nach.find('>') {
+            Some(e) => {
+                aus.push_str("<span>");
+                rest = &nach[e + 1..];
+            }
+            None => {
+                aus.push_str(nach);
+                rest = "";
+            }
+        }
+    }
+    aus.push_str(rest);
+    aus.replace("</a>", "</span>")
+}
+
 enum Tag {
     Oeffnen(&'static str, String),
     Schliessen(&'static str),
@@ -167,12 +190,12 @@ fn entitaet(rest: &str) -> Option<usize> {
     let ende = rest.find(';')?;
     let name = &rest[..ende];
     let ok = matches!(name, "amp" | "lt" | "gt" | "quot" | "apos")
-        || name
-            .strip_prefix("#x")
-            .is_some_and(|h| !h.is_empty() && h.len() <= 6 && h.chars().all(|c| c.is_ascii_hexdigit()))
-        || name
-            .strip_prefix('#')
-            .is_some_and(|d| !d.is_empty() && d.len() <= 7 && d.chars().all(|c| c.is_ascii_digit()));
+        || name.strip_prefix("#x").is_some_and(|h| {
+            !h.is_empty() && h.len() <= 6 && h.chars().all(|c| c.is_ascii_hexdigit())
+        })
+        || name.strip_prefix('#').is_some_and(|d| {
+            !d.is_empty() && d.len() <= 7 && d.chars().all(|c| c.is_ascii_digit())
+        });
     ok.then_some(ende + 1)
 }
 
@@ -181,13 +204,27 @@ mod tests {
     use super::*;
 
     fn pango_ok(markup: &str) -> bool {
-        gtk4::pango::parse_markup(markup, '\0').is_ok()
+        gtk4::pango::parse_markup(&pango_pruefbar(markup), '\0').is_ok()
+    }
+
+    #[test]
+    fn pruefbar_ersetzt_links() {
+        assert_eq!(
+            pango_pruefbar(r#"x <a href="https://a.de">l</a> y"#),
+            "x <span>l</span> y"
+        );
+        assert_eq!(pango_pruefbar("<b>kein Link</b>"), "<b>kein Link</b>");
     }
 
     #[test]
     fn erlaubte_tags_bleiben() {
-        assert_eq!(bereinige("<b>fett</b> <i>kursiv</i> <u>unter</u>"), "<b>fett</b> <i>kursiv</i> <u>unter</u>");
-        assert!(pango_ok(&bereinige("<b>fett</b> <i>kursiv</i> <u>unter</u>")));
+        assert_eq!(
+            bereinige("<b>fett</b> <i>kursiv</i> <u>unter</u>"),
+            "<b>fett</b> <i>kursiv</i> <u>unter</u>"
+        );
+        assert!(pango_ok(&bereinige(
+            "<b>fett</b> <i>kursiv</i> <u>unter</u>"
+        )));
     }
 
     #[test]
@@ -198,7 +235,10 @@ mod tests {
     #[test]
     fn links_mit_sicherem_ziel() {
         let aus = bereinige(r#"<a href="https://example.org/?a=1&b=2">Link</a>"#);
-        assert_eq!(aus, r#"<a href="https://example.org/?a=1&amp;b=2">Link</a>"#);
+        assert_eq!(
+            aus,
+            r#"<a href="https://example.org/?a=1&amp;b=2">Link</a>"#
+        );
         assert!(pango_ok(&aus));
     }
 
@@ -212,13 +252,19 @@ mod tests {
     #[test]
     fn fremde_tags_werden_escaped() {
         let aus = bereinige("<script>böse</script> <span color=\"red\">rot</span>");
-        assert_eq!(aus, "&lt;script&gt;böse&lt;/script&gt; &lt;span color=\"red\"&gt;rot&lt;/span&gt;");
+        assert_eq!(
+            aus,
+            "&lt;script&gt;böse&lt;/script&gt; &lt;span color=\"red\"&gt;rot&lt;/span&gt;"
+        );
         assert!(pango_ok(&aus));
     }
 
     #[test]
     fn bild_tag_wird_entfernt() {
-        assert_eq!(bereinige(r#"vor <img src="x.png" alt="x"/> nach"#), "vor  nach");
+        assert_eq!(
+            bereinige(r#"vor <img src="x.png" alt="x"/> nach"#),
+            "vor  nach"
+        );
         assert_eq!(bereinige(r#"<img src="x.png">"#), "");
     }
 
@@ -260,7 +306,10 @@ mod tests {
     #[test]
     fn entitaeten_bleiben_rest_wird_escaped() {
         let aus = bereinige("Tom &amp; Jerry &lt;3 &#8364; &#x20AC; Kaffee & Kuchen &bogus; &");
-        assert_eq!(aus, "Tom &amp; Jerry &lt;3 &#8364; &#x20AC; Kaffee &amp; Kuchen &amp;bogus; &amp;");
+        assert_eq!(
+            aus,
+            "Tom &amp; Jerry &lt;3 &#8364; &#x20AC; Kaffee &amp; Kuchen &amp;bogus; &amp;"
+        );
         assert!(pango_ok(&aus));
     }
 
