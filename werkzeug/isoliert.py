@@ -51,6 +51,31 @@ def main() -> int:
             f.write('<?xml version="1.0"?>\n<labwc_config>\n'
                     '  <core><decoration>server</decoration></core>\n'
                     '</labwc_config>\n')
+    # PT-1 (nach SW-6, QD-037): keine Portale im Wegwerf-Bus. Sonst startet
+    # xdg-document-portal und sein FUSE-Mount <laufzeit>/doc erscheint im echten
+    # Querencia Files unter „Geräte“. $XDG_DATA_HOME/dbus-1/services hat beim
+    # Sitzungsbus Vorrang vor /usr/share; die Einträge hier machen die Portale
+    # nicht aktivierbar.
+    masken = os.path.join(profile, "data", "dbus-1", "services")
+    os.makedirs(masken, exist_ok=True)
+    for name in ("org.freedesktop.portal.Documents", "org.freedesktop.portal.Desktop",
+                 "org.freedesktop.impl.portal.PermissionStore"):
+        with open(os.path.join(masken, name + ".service"), "w") as f:
+            f.write(f"[D-BUS Service]\nName={name}\nExec=/bin/false\n")
+    # PT-1: Ohne Settings-Portal nimmt GTK seine eingebaute Schrift (kleiner
+    # als live, verschiebt Layouts und Klickziele). Die Schrift der echten
+    # Sitzung (nur gelesen) kommt deshalb ins Profil, außer es hat eine eigene.
+    gtk4 = os.path.join(profile, "config", "gtk-4.0", "settings.ini")
+    if not os.path.exists(gtk4):
+        try:
+            schrift = subprocess.run(["gsettings", "get", "org.gnome.desktop.interface", "font-name"],
+                                     capture_output=True, text=True, timeout=5).stdout.strip().strip("'")
+        except (OSError, subprocess.TimeoutExpired):
+            schrift = ""
+        if schrift:
+            os.makedirs(os.path.dirname(gtk4), exist_ok=True)
+            with open(gtk4, "w") as f:
+                f.write(f"[Settings]\ngtk-font-name={schrift}\n")
     runtime = tempfile.mkdtemp(prefix="qed-runtime-", dir=os.path.expanduser("~/projects/querencia-benachrichtigungen/laufzeit"))
     os.chmod(runtime, 0o700)
 
@@ -71,6 +96,8 @@ def main() -> int:
         "WLR_HEADLESS_OUTPUTS": "1",
         "WLR_LIBINPUT_NO_DEVICES": "1",
         "XKB_DEFAULT_LAYOUT": "de",
+        "GDK_DEBUG": "no-portals",
+        "GTK_USE_PORTAL": "0",
         "HMP04_PROFILE": profile,
     })
     # User directories as on the VM (the profile has no user-dirs.dirs of
@@ -122,6 +149,14 @@ def main() -> int:
         except (OSError, ProcessLookupError):
             pass
     time.sleep(1)
+    # PT-1: falls doch ein Portal lief, nur den eigenen doc-Mount aushängen.
+    # Über /proc/self/mounts, weil os.path.ismount() einen toten FUSE-Mount
+    # („Transport endpoint is not connected“) nicht erkennt.
+    doc = os.path.join(os.path.realpath(runtime), "doc")
+    with open("/proc/self/mounts") as f:
+        eigen = any(z.split()[1] == doc for z in f)
+    if eigen and subprocess.run(["fusermount3", "-u", doc], stderr=subprocess.DEVNULL).returncode:
+        subprocess.run(["fusermount3", "-u", "-z", doc], check=False)
     shutil.rmtree(runtime, ignore_errors=True)
     for pid in SESSION_LABWC_PIDS:
         assert os.path.exists(f"/proc/{pid}"), "Sitzungs-labwc verschwunden!"
