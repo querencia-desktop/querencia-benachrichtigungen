@@ -117,7 +117,7 @@ NS=$!
 sleep 1
 shot 05-aktionen
 # Knöpfe rechts unten im Kasten. Position: Kasten oben y=40, Höhe ~ 90; Knopf „Nein“ rechts bei x ca. w-8-8-30
-q "move 985 108" "wait 300" "click" "wait 800"
+q "move 978 129" "wait 300" "click" "wait 800"
 if wait $NS; then :; fi
 ANTWORT=$(cat "$OUT/aktion-antwort.txt")
 [ "$ANTWORT" = nein ] && ok "ActionInvoked per Klick auf „Nein“ (Client erhält „$ANTWORT“)" || nok "Aktion: Client erhielt „$ANTWORT“"
@@ -214,7 +214,7 @@ N=$("$BIN" --verlauf 2>&1 | tail -1)
 sleep 1
 # Querencia-Schnittstelle per gdbus
 Z=$(gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.querencia.Benachrichtigungen.Zustand 2>&1)
-[[ $Z == "(false, 0, 0)" ]] && ok "org.querencia.Benachrichtigungen.Zustand: $Z" || nok "Zustand: $Z"
+[[ $Z == "(false, uint32 0, uint32 0)" ]] && ok "org.querencia.Benachrichtigungen.Zustand: $Z" || nok "Zustand: $Z"
 gdbus introspect --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications >"$OUT/introspect.txt" 2>&1
 grep -q "SetzeNichtStoeren\|NotificationClosed\|ActionInvoked\|ZustandGeaendert" "$OUT/introspect.txt" && ok "Introspektion zeigt beide Schnittstellen" || nok "Introspektion"
 
