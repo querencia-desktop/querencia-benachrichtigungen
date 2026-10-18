@@ -58,7 +58,7 @@ lage() { # $1 Bild, $2 Panelhöhe, $3 Ausgabedatei
     local w h y0 xl
     read -r w h < <(python3 -I "$BILD" "$1" groesse)
     y0=$(python3 -I "$BILD" "$1" erste-helle-zeile $((w-30)))
-    xl=$(python3 -I "$BILD" "$1" linke-kante $((y0+20)))
+    xl=$(python3 -I "$BILD" "$1" linke-kante $((y0+4)))
     {
         echo "Größe $w $h"
         echo "Panelpixel $(python3 -I "$BILD" "$1" pixel $((w/2)) 10)"
@@ -86,10 +86,10 @@ sleep 3.2
 [ "$(sichtbar)" = 0 ] && ok "low: nach 3 s weg" || nok "low: nach 4 s noch sichtbar=$(sichtbar)"
 
 # 7 mit Symbol (Themenname, Dateipfad, desktop-entry, image-path)
-notify-send -i dialog-warning "Mit Themensymbol" "Symbol dialog-warning aus dem Thema" -t 20000
-notify-send -i /usr/share/icons/mate/48x48/status/dialog-information.png "Mit Dateipfad" "Symbol aus PNG-Datei" -t 20000
-notify-send -h string:desktop-entry:org.test.Probe "Mit desktop-entry" "Symbol mail-unread aus org.test.Probe.desktop" -t 20000
-notify-send -h string:image-path:/usr/share/icons/mate/48x48/status/dialog-error.png "Mit image-path" "Hint image-path, PNG" -t 20000
+IDS1=$(notify-send -p -i dialog-warning "Mit Themensymbol" "Symbol dialog-warning aus dem Thema" -t 20000)
+IDS2=$(notify-send -p -i /usr/share/icons/mate/48x48/status/dialog-information.png "Mit Dateipfad" "Symbol aus PNG-Datei" -t 20000)
+IDS3=$(notify-send -p -h string:desktop-entry:org.test.Probe "Mit desktop-entry" "Symbol mail-unread aus org.test.Probe.desktop" -t 20000)
+IDS4=$(notify-send -p -h string:image-path:/usr/share/icons/mate/48x48/status/dialog-error.png "Mit image-path" "Hint image-path, PNG" -t 20000)
 sleep 1
 shot 03-symbole
 [ "$(sichtbar)" = 4 ] && ok "vier Meldungen mit Symbol (Thema, Datei, desktop-entry, image-path) sichtbar (Bild 03)" || nok "Symbole: sichtbar=$(sichtbar)"
@@ -99,15 +99,20 @@ q "move 999 57" "wait 300" "click" "wait 600"
 [ "$(sichtbar)" = 3 ] && ok "Schließen-X schließt die oberste Meldung" || nok "Schließen-X: sichtbar=$(sichtbar)"
 shot 04-nach-x
 # Rest per CloseNotification schließen
-for i in 4 5 6; do gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification $i >/dev/null 2>&1; done
+for i in $IDS2 $IDS3 $IDS4; do gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification $i >/dev/null 2>&1; done
 sleep 0.5
 [ "$(sichtbar)" = 0 ] && ok "CloseNotification schließt die übrigen drei" || nok "CloseNotification: sichtbar=$(sichtbar)"
 grep -A3 "NotificationClosed" "$OUT/signale.log" | grep -q "uint32 3$" && ok "NotificationClosed Grund 3 (Aufruf) gesendet" || nok "Grund 3 fehlt"
 E=$(gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification 999 2>&1)
 [[ $E == *Error* ]] && ok "CloseNotification(999) liefert Fehler: ${E:0:70}" || nok "CloseNotification unbekannt: $E"
 
-# 8 Aktionen: Knopf anklicken -> ActionInvoked
-notify-send -A "ja=Ja, bitte" -A "nein=Nein" "Mit Aktionen" "Zwei Knöpfe; Klick auf „Nein“" -t 0 >"$OUT/aktion-antwort.txt" 2>&1 &
+# 8 Aktionen: Knopf anklicken -> ActionInvoked. Nicht mit notify-send -A:
+# Ubuntus AppArmor-Profil für notify-send erlaubt nur GetServerInformation
+# und Notify, GetCapabilities wird abgelehnt (dbus-monitor: AccessDenied),
+# darum glaubt notify-send, der Dienst könne keine Aktionen. melden.py ist
+# ein kleiner Gio-Client ohne diese Beschränkung.
+MELDEN="python3 -I $(dirname "$0")/melden.py"
+$MELDEN --wait -a "ja=Ja, bitte" -a "nein=Nein" -t 0 "Mit Aktionen" "Zwei Knöpfe; Klick auf „Nein“" >"$OUT/aktion-antwort.txt" 2>&1 &
 NS=$!
 sleep 1
 shot 05-aktionen
@@ -115,22 +120,27 @@ shot 05-aktionen
 q "move 985 108" "wait 300" "click" "wait 800"
 if wait $NS; then :; fi
 ANTWORT=$(cat "$OUT/aktion-antwort.txt")
-[ "$ANTWORT" = nein ] && ok "ActionInvoked per Klick auf „Nein“ (notify-send -A gibt „$ANTWORT“ aus)" || nok "Aktion: notify-send gab „$ANTWORT“"
+[ "$ANTWORT" = nein ] && ok "ActionInvoked per Klick auf „Nein“ (Client erhält „$ANTWORT“)" || nok "Aktion: Client erhielt „$ANTWORT“"
 grep -A3 "ActionInvoked" "$OUT/signale.log" | grep -q '"nein"' && ok "Signal ActionInvoked(…, \"nein\") im dbus-monitor" || nok "ActionInvoked fehlt im Monitor"
 [ "$(sichtbar)" = 0 ] && ok "Meldung nach Aktion geschlossen" || nok "nach Aktion sichtbar=$(sichtbar)"
 
+# 8b Befund notify-send -A (AppArmor): erwartet die Fehlermeldung von notify-send selbst
+notify-send -A "x=X" "AppArmor-Probe" "notify-send -A" -t 1 >"$OUT/notify-send-A.txt" 2>&1
+grep -q "Actions are not supported" "$OUT/notify-send-A.txt" && echo "HINW notify-send -A scheitert an Ubuntus AppArmor-Profil (GetCapabilities verboten), nicht am Dienst" | tee -a "$R"
+sleep 0.5
+
 # 9 Default-Aktion per Klick auf die Meldung
-notify-send -A "default=Öffnen" "Default-Aktion" "Klick auf den Text löst „default“ aus" -t 0 >"$OUT/default-antwort.txt" 2>&1 &
+$MELDEN --wait -a "default=Öffnen" -t 0 "Default-Aktion" "Klick auf den Text löst „default“ aus" >"$OUT/default-antwort.txt" 2>&1 &
 NS=$!
 sleep 1
 shot 06-default
 q "move 850 75" "wait 300" "click" "wait 800"
 if wait $NS; then :; fi
 ANTWORT=$(cat "$OUT/default-antwort.txt")
-[ "$ANTWORT" = default ] && ok "Klick auf die Meldung löst die Default-Aktion aus" || nok "Default: notify-send gab „$ANTWORT“"
+[ "$ANTWORT" = default ] && ok "Klick auf die Meldung löst die Default-Aktion aus" || nok "Default: Client erhielt „$ANTWORT“"
 
 # 10 kritisch ohne Timeout
-notify-send -u critical "Kritisch" "Oranger Rand, bleibt stehen" -t 2000
+IDK=$(notify-send -p -u critical "Kritisch" "Oranger Rand, bleibt stehen" -t 2000)
 sleep 3.5
 shot 07-kritisch
 [ "$(sichtbar)" = 1 ] && ok "kritische Meldung bleibt trotz -t 2000 stehen" || nok "kritisch: sichtbar=$(sichtbar) nach 3,5 s"
@@ -144,8 +154,8 @@ q "move 850 170" "wait 7000"
 shot 08-hover
 q "move 300 500" "wait 6000"
 [ "$(sichtbar)" = 1 ] && ok "nach dem Verlassen läuft die Zeit weiter (Meldung weg)" || nok "nach Hover: sichtbar=$(sichtbar)"
-# Kritische mit X schließen
-gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification 9 >/dev/null 2>&1
+# Kritische per Aufruf schließen
+gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification "$IDK" >/dev/null 2>&1
 sleep 0.5
 
 # 11 replaces_id
@@ -161,24 +171,24 @@ gdbus call --session --dest org.freedesktop.Notifications --object-path /org/fre
 sleep 0.5
 
 # 12 Markup
-notify-send "Markup" "<b>fett</b> <i>kursiv</i> <u>unter</u> <a href=\"https://querencia.example\">Link</a> &amp; 3 &lt; 5 <script>x</script> <img src=\"a\"/>" -t 0
+IDM=$(notify-send -p "Markup" "<b>fett</b> <i>kursiv</i> <u>unter</u> <a href=\"https://querencia.example\">Link</a> &amp; 3 &lt; 5 <script>x</script> <img src=\"a\"/>" -t 0)
 sleep 0.8
 shot 10-markup
 [ "$(sichtbar)" = 1 ] && ok "Body-Markup dargestellt (Bild 10), fremdes Tag als Text" || nok "Markup: sichtbar=$(sichtbar)"
-grep -qi "pango\|markup" "$LOG" && nok "Markup-Warnung im Log" || ok "keine Pango-Markup-Warnung"
-gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification 11 >/dev/null 2>&1
+grep -q "Pango-WARNING\|Failed to set text\|Invalid markup\|Gtk-WARNING.*markup" "$LOG" && nok "Markup-Warnung im Log" || ok "keine Pango-Markup-Warnung"
+gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification "$IDM" >/dev/null 2>&1
 sleep 0.5
 
 # 13 sieben Meldungen: 5 sichtbar, 2 warten; nachrücken
-for i in 1 2 3 4 5 6 7; do notify-send -t 0 "Meldung $i von 7" "Stapel und Warteschlange" ; done
+IDS=(); for i in 1 2 3 4 5 6 7; do IDS+=("$(notify-send -p -t 0 "Meldung $i von 7" "Stapel und Warteschlange")"); done
 sleep 1.2
 shot 11-stapel-7
 [ "$(sichtbar)" = 5 ] && [ "$(wartend)" = 2 ] && ok "7 Meldungen: 5 sichtbar, 2 warten" || nok "Stapel: sichtbar=$(sichtbar) wartend=$(wartend)"
-gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification 12 >/dev/null 2>&1
+gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification "${IDS[0]}" >/dev/null 2>&1
 sleep 0.8
 shot 12-nachgerueckt
 [ "$(sichtbar)" = 5 ] && [ "$(wartend)" = 1 ] && ok "nach Schließen rückt eine wartende Meldung nach (5/1)" || nok "Nachrücken: sichtbar=$(sichtbar) wartend=$(wartend)"
-for i in 13 14 15 16 17 18; do gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification $i >/dev/null 2>&1; done
+for i in "${IDS[@]:1}"; do gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification "$i" >/dev/null 2>&1; done
 sleep 0.5
 [ "$(sichtbar)" = 0 ] && [ "$(wartend)" = 0 ] && ok "alle geschlossen, Schlange leer" || nok "Rest: sichtbar=$(sichtbar) wartend=$(wartend)"
 

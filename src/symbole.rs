@@ -12,6 +12,46 @@ use crate::modell::{BildDaten, Dringlichkeit, Meldung};
 
 pub const GROESSE: i32 = 48;
 
+/// Symbolthema des GNOME-2-Looks, dieselbe Regel wie im Querencia Panel
+/// (`classic_icon_theme` in querencia-panel/src/main.rs): nur wenn das
+/// aktuelle Thema das eingebaute GTK-Standardthema ist und gnome-human
+/// installiert ist. Adwaita 50 hat keine farbigen Statussymbole mehr.
+const KLASSISCHES_THEMA: &str = "gnome-human";
+
+pub fn klassisches_thema(
+    aktuell: &str,
+    installiert: impl Fn(&str) -> bool,
+) -> Option<&'static str> {
+    let eingebaut = matches!(aktuell, "" | "Adwaita" | "hicolor");
+    (eingebaut && installiert(KLASSISCHES_THEMA)).then_some(KLASSISCHES_THEMA)
+}
+
+fn thema_installiert(name: &str, verzeichnisse: &[PathBuf]) -> bool {
+    verzeichnisse
+        .iter()
+        .any(|v| v.join("icons").join(name).join("index.theme").is_file())
+}
+
+/// Schaltet diesen Prozess auf das klassische Symbolthema, wo
+/// [`klassisches_thema`] es sagt. Nur die Einstellung dieses Prozesses.
+pub fn klassisches_thema_verwenden() {
+    let Some(settings) = gtk4::Settings::default() else {
+        return;
+    };
+    let aktuell = settings
+        .gtk_icon_theme_name()
+        .map(|n| n.to_string())
+        .unwrap_or_default();
+    let verzeichnisse = datenverzeichnisse();
+    match klassisches_thema(&aktuell, |n| thema_installiert(n, &verzeichnisse)) {
+        Some(thema) => {
+            settings.set_gtk_icon_theme_name(Some(thema));
+            crate::dbus::log(&format!("Symbolthema {thema} (statt „{aktuell}“)"));
+        }
+        None => crate::dbus::log(&format!("Symbolthema „{aktuell}“ bleibt")),
+    }
+}
+
 /// Das Symbol-Widget für eine Meldung, immer `GROESSE` × `GROESSE`.
 pub fn widget(m: &Meldung) -> gtk4::Widget {
     if let Some(w) = m.bild_daten.as_ref().and_then(aus_daten) {
@@ -171,6 +211,44 @@ mod tests {
             pfad_aus_angabe("~/bild.png"),
             Some(glib::home_dir().join("bild.png"))
         );
+    }
+
+    #[test]
+    fn klassisches_thema_nur_statt_eingebautem_standard() {
+        let installiert = |n: &str| n == "gnome-human";
+        for aktuell in ["Adwaita", "hicolor", ""] {
+            assert_eq!(
+                klassisches_thema(aktuell, installiert),
+                Some("gnome-human"),
+                "{aktuell:?}"
+            );
+        }
+        assert_eq!(
+            klassisches_thema("Humanity", installiert),
+            None,
+            "vom Benutzer gewählt bleibt"
+        );
+        assert_eq!(klassisches_thema("gnome-human", installiert), None);
+        assert_eq!(
+            klassisches_thema("Adwaita", |_| false),
+            None,
+            "nicht installiert"
+        );
+    }
+
+    #[test]
+    fn thema_installiert_prueft_index_theme() {
+        let dir = std::env::temp_dir().join(format!("qb-thema-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("icons/gnome-human")).unwrap();
+        assert!(!thema_installiert("gnome-human", std::slice::from_ref(&dir)));
+        std::fs::write(dir.join("icons/gnome-human/index.theme"), "[Icon Theme]\n").unwrap();
+        assert!(thema_installiert("gnome-human", std::slice::from_ref(&dir)));
+        assert!(!thema_installiert(
+            "gnome-human",
+            &[PathBuf::from("/nirgends")]
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

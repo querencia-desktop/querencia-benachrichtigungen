@@ -90,6 +90,7 @@ pub struct Dienst {
 impl Dienst {
     fn neu(conn: Connection, zustand: Arc<Mutex<Zustand>>) -> Result<Self, String> {
         let display = gdk::Display::default().ok_or("kein Display")?;
+        symbole::klassisches_thema_verwenden();
         let css = gtk4::CssProvider::new();
         css.load_from_string(CSS);
         gtk4::style_context_add_provider_for_display(
