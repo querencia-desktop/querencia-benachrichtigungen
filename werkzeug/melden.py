@@ -46,8 +46,11 @@ result = {}
 
 
 def on_signal(conn, sender, path, iface, signal, params):
-    if params[0] != result.get('id'):
+    # Nur das erste Signal zur eigenen ID zählt (nach ActionInvoked folgt
+    # sofort NotificationClosed, beide liegen oft in derselben Schleifenrunde).
+    if params[0] != result.get('id') or result.get('fertig'):
         return
+    result['fertig'] = True
     if signal == 'ActionInvoked':
         print(params[1])
     else:

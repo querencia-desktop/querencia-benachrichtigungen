@@ -241,7 +241,10 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("qb-thema-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("icons/gnome-human")).unwrap();
-        assert!(!thema_installiert("gnome-human", std::slice::from_ref(&dir)));
+        assert!(!thema_installiert(
+            "gnome-human",
+            std::slice::from_ref(&dir)
+        ));
         std::fs::write(dir.join("icons/gnome-human/index.theme"), "[Icon Theme]\n").unwrap();
         assert!(thema_installiert("gnome-human", std::slice::from_ref(&dir)));
         assert!(!thema_installiert(

@@ -436,12 +436,20 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
     klick.set_button(gdk::BUTTON_PRIMARY);
     klick.set_propagation_phase(gtk4::PropagationPhase::Bubble);
     klick.connect_released(move |geste, _, x, y| {
-        let auf_knopf = geste
+        let ziel = geste
             .widget()
-            .and_then(|w| w.pick(x, y, gtk4::PickFlags::DEFAULT))
-            .is_some_and(|w| {
-                w.is::<gtk4::Button>() || w.ancestor(gtk4::Button::static_type()).is_some()
-            });
+            .and_then(|w| w.pick(x, y, gtk4::PickFlags::DEFAULT));
+        let auf_knopf = ziel.as_ref().is_some_and(|w| {
+            w.is::<gtk4::Button>() || w.ancestor(gtk4::Button::static_type()).is_some()
+        });
+        if std::env::var_os("QB_DEBUG").is_some() {
+            dbus::log(&format!(
+                "Klick bei {x:.0},{y:.0} auf {} (Knopf: {auf_knopf})",
+                ziel.as_ref()
+                    .map(|w| w.type_().name().to_string())
+                    .unwrap_or_else(|| "nichts".into())
+            ));
+        }
         if auf_knopf {
             return;
         }

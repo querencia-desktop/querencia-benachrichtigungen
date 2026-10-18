@@ -11,6 +11,11 @@ nok() { echo "FAIL $*" | tee -a "$R"; }
 blocked() { echo "BLOCKED $*" | tee -a "$R"; }
 . "$(dirname "$0")/eingabe.sh"
 shot() { sleep "${2:-0.6}"; grim "$OUT/$1.png"; }
+# qeingabe sendet absolute Zeigerkoordinaten im 1280x720-Raster (W/H in
+# qeingabe.c); der Compositor skaliert sie auf den Ausgang. zeiger X Y nimmt
+# Bildschirmkoordinaten der aktuellen Auflösung ($AUSW x $AUSH).
+AUSW=1024; AUSH=768
+zeiger() { q "move $(( $1 * 1280 / AUSW )) $(( $2 * 720 / AUSH ))"; }
 LOG=$OUT/dienst.log
 BILD=$(dirname "$0")/bild.py
 zustand() { "$BIN" --nicht-stoeren status 2>&1; }
@@ -95,7 +100,7 @@ shot 03-symbole
 [ "$(sichtbar)" = 4 ] && ok "vier Meldungen mit Symbol (Thema, Datei, desktop-entry, image-path) sichtbar (Bild 03)" || nok "Symbole: sichtbar=$(sichtbar)"
 grep -q "image-missing\|kein Symbol" "$LOG" && nok "Symbolwarnungen im Log" || ok "keine Symbolwarnungen"
 # Schließen-X der obersten Meldung: X liegt oben rechts im Kasten (ca. x=w-8-8-9, y=32+8+8+9)
-q "move 999 57" "wait 300" "click" "wait 600"
+zeiger 998 59; q "wait 300" "click" "wait 600"
 [ "$(sichtbar)" = 3 ] && ok "Schließen-X schließt die oberste Meldung" || nok "Schließen-X: sichtbar=$(sichtbar)"
 shot 04-nach-x
 # Rest per CloseNotification schließen
@@ -117,7 +122,7 @@ NS=$!
 sleep 1
 shot 05-aktionen
 # Knöpfe rechts unten im Kasten. Position: Kasten oben y=40, Höhe ~ 90; Knopf „Nein“ rechts bei x ca. w-8-8-30
-q "move 978 129" "wait 300" "click" "wait 800"
+zeiger 978 129; q "wait 300" "click" "wait 800"
 if wait $NS; then :; fi
 ANTWORT=$(cat "$OUT/aktion-antwort.txt")
 [ "$ANTWORT" = nein ] && ok "ActionInvoked per Klick auf „Nein“ (Client erhält „$ANTWORT“)" || nok "Aktion: Client erhielt „$ANTWORT“"
@@ -134,7 +139,7 @@ $MELDEN --wait -a "default=Öffnen" -t 0 "Default-Aktion" "Klick auf den Text l�
 NS=$!
 sleep 1
 shot 06-default
-q "move 850 75" "wait 300" "click" "wait 800"
+zeiger 850 75; q "wait 300" "click" "wait 800"
 if wait $NS; then :; fi
 ANTWORT=$(cat "$OUT/default-antwort.txt")
 [ "$ANTWORT" = default ] && ok "Klick auf die Meldung löst die Default-Aktion aus" || nok "Default: Client erhielt „$ANTWORT“"
@@ -149,10 +154,10 @@ cat "$OUT/kritisch-rand.txt"
 [ "$(sed -n 's/.*: //p' "$OUT/kritisch-rand.txt")" -gt 500 ] && ok "oranger Rand (#F07746) bei kritischer Meldung: $(cat "$OUT/kritisch-rand.txt")" || nok "kein oranger Rand: $(cat "$OUT/kritisch-rand.txt")"
 # Hover hält an: normale Meldung, Zeiger drauf, nach 7 s noch da; Zeiger weg, dann verschwindet sie
 notify-send "Überfahren" "Zeiger hält die Zeit an" ; sleep 0.5
-q "move 850 170" "wait 7000"
+zeiger 850 170; q "wait 7000"
 [ "$(sichtbar)" = 2 ] && ok "Hover hält die Meldung über 7 s" || nok "Hover: sichtbar=$(sichtbar)"
 shot 08-hover
-q "move 300 500" "wait 6000"
+zeiger 300 500; q "wait 6000"
 [ "$(sichtbar)" = 1 ] && ok "nach dem Verlassen läuft die Zeit weiter (Meldung weg)" || nok "nach Hover: sichtbar=$(sichtbar)"
 # Kritische per Aufruf schließen
 gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.CloseNotification "$IDK" >/dev/null 2>&1
@@ -219,7 +224,7 @@ gdbus introspect --session --dest org.freedesktop.Notifications --object-path /o
 grep -q "SetzeNichtStoeren\|NotificationClosed\|ActionInvoked\|ZustandGeaendert" "$OUT/introspect.txt" && ok "Introspektion zeigt beide Schnittstellen" || nok "Introspektion"
 
 # --- 1920x1080, Attrappe 32 px ------------------------------------------
-"$QA" 1920x1080 2>>"$OUT/qausgabe.log"; sleep 1.5
+"$QA" 1920x1080 2>>"$OUT/qausgabe.log"; sleep 1.5; AUSW=1920; AUSH=1080
 notify-send -u critical "Kritisch bei 1920×1080" "unter dem Panel, rechts" -t 0
 notify-send "Zweite Meldung" "Stapel nach unten" -t 0
 notify-send -i dialog-information "Dritte Meldung" "mit Symbol" -t 0
