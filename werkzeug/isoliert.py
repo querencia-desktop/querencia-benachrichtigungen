@@ -21,12 +21,23 @@ import sys
 import tempfile
 import time
 
-LABWC = "~/opt/labwc-0.9.8/bin/labwc"
+# labwc 0.9.8: QUERENCIA_LABWC, sonst der Eigenbau unter ~/opt/labwc-0.9.8
+# (Entwicklungs-VM), sonst labwc aus dem PATH.
+def _labwc() -> str:
+    for p in (os.environ.get("QUERENCIA_LABWC"),
+              os.path.expanduser("~/opt/labwc-0.9.8/bin/labwc"),
+              shutil.which("labwc")):
+        if p and os.access(p, os.X_OK):
+            return os.path.realpath(p)
+    return "labwc"
+
+
+LABWC = _labwc()
 def _session_labwc(pid: str) -> bool:
     """labwc der echten Sitzung (XDG_RUNTIME_DIR unter /run/user), nicht die
     isolierten Testsitzungen anderer Worker, die jederzeit enden dürfen."""
     try:
-        if os.readlink(f"/proc/{pid}/exe") != LABWC:
+        if os.path.basename(os.readlink(f"/proc/{pid}/exe")) != "labwc":
             return False
         with open(f"/proc/{pid}/environ", "rb") as f:
             env = f.read().split(b"\0")
@@ -76,13 +87,15 @@ def main() -> int:
             os.makedirs(os.path.dirname(gtk4), exist_ok=True)
             with open(gtk4, "w") as f:
                 f.write(f"[Settings]\ngtk-font-name={schrift}\n")
-    runtime = tempfile.mkdtemp(prefix="qed-runtime-", dir=os.path.expanduser("~/projects/querencia-benachrichtigungen/laufzeit"))
+    laufzeit = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "laufzeit")
+    os.makedirs(laufzeit, exist_ok=True)
+    runtime = tempfile.mkdtemp(prefix="qed-runtime-", dir=laufzeit)
     os.chmod(runtime, 0o700)
 
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("WAYLAND", "DBUS", "DISPLAY", "XDG_", "LABWC", "SWAYSOCK"))}
     env.update({
-        "HOME": "~",
+        "HOME": os.path.expanduser("~"),
         "XDG_RUNTIME_DIR": runtime,
         "XDG_CONFIG_HOME": os.path.join(profile, "config"),
         "XDG_DATA_HOME": os.path.join(profile, "data"),
@@ -102,7 +115,7 @@ def main() -> int:
     })
     # User directories as on the VM (the profile has no user-dirs.dirs of
     # its own unless the caller made one).
-    real_dirs = "~/.config/user-dirs.dirs"
+    real_dirs = os.path.expanduser("~/.config/user-dirs.dirs")
     own_dirs = os.path.join(profile, "config/user-dirs.dirs")
     if os.path.exists(real_dirs) and not os.path.exists(own_dirs):
         shutil.copy2(real_dirs, own_dirs)
