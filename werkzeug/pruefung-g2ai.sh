@@ -12,7 +12,10 @@ if [ "${1-}" != --innen ]; then
         printf '[D-BUS Service]\nName=%s\nExec=/bin/false\n' "$n" >"$P/data/dbus-1/services/$n.service"
     done
     RT=$(mktemp -d /tmp/qed-runtime-XXXXXX)
-    env -i HOME="$HOME" PATH=/usr/bin:/bin LANG=en_US.UTF-8 LANGUAGE=de XDG_RUNTIME_DIR="$RT" \
+    # QB_EIGENES_HOME=1: eigenes HOME im Ausgabeordner (0.2.0); labwc kommt
+    # dann über LABWC_BIN, weil ~ im inneren Teil auf das neue HOME zeigt.
+    H=$HOME; [ "${QB_EIGENES_HOME:-}" = 1 ] && { H=$OUT/home; mkdir -p "$H"; }
+    env -i HOME="$H" LABWC_BIN="$(realpath ~/opt/labwc-0.9.8/bin/labwc)" PATH=/usr/bin:/bin LANG=en_US.UTF-8 LANGUAGE=de XDG_RUNTIME_DIR="$RT" \
         XDG_DATA_HOME="$P/data" XDG_CONFIG_HOME="$P/config" XDG_STATE_HOME="$P/state" XDG_DATA_DIRS=/usr/share \
         GDK_DEBUG=no-portals BIN="$BIN" OUT="$OUT" \
         timeout 90 dbus-run-session -- bash "$(realpath "$0")" --innen >"$OUT/lauf.log" 2>&1
@@ -50,7 +53,7 @@ warte_ende 10 $p
 # headless labwc mit Xwayland für N02–N04
 mkdir -p "$OUT/labwc"; echo '<labwc_config/>' >"$OUT/labwc/rc.xml"
 WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1 \
-    ~/opt/labwc-0.9.8/bin/labwc -C "$OUT/labwc" -s "sh -c 'echo \$WAYLAND_DISPLAY \$DISPLAY >$OUT/sockets.txt; sleep 600'" \
+    "${LABWC_BIN:-$HOME/opt/labwc-0.9.8/bin/labwc}" -C "$OUT/labwc" -s "sh -c 'echo \$WAYLAND_DISPLAY \$DISPLAY >$OUT/sockets.txt; sleep 600'" \
     >"$OUT/labwc.log" 2>&1 & L=$!
 for _ in $(seq 1 50); do [ -s "$OUT/sockets.txt" ] && break; sleep 0.1; done
 read -r WD XD <"$OUT/sockets.txt"
