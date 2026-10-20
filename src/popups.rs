@@ -1,8 +1,12 @@
-//! Die Popups: ein einziges Layer-Shell-Fenster (Ebene overlay, oben rechts,
-//! ohne Tastatur) mit einer senkrechten Spalte von höchstens `MAX_SICHTBAR`
-//! Meldungskästen; weitere Meldungen warten in einer Schlange. Das Fenster
-//! setzt die Exklusivzone 0, dadurch legt der Compositor es unter das obere
-//! Panel (dessen Exklusivzone), ohne dass die Panelhöhe geraten wird.
+//! Die Popups: ein einziges Layer-Shell-Fenster (Ebene overlay, ohne
+//! Tastatur; oben rechts, oben in der Mitte oder unten rechts nach der ini)
+//! mit einer senkrechten Spalte von höchstens `MAX_SICHTBAR` Meldungskästen;
+//! weitere Meldungen warten in einer Schlange. Das Fenster setzt die
+//! Exklusivzone 0, dadurch legt der Compositor es neben die Panels (deren
+//! Exklusivzonen), ohne dass die Panelhöhe geraten wird.
+//!
+//! Der `Dienst` des GTK-Threads hält auch die Mitteilungszentrale
+//! (`zentrale.rs`) und führt alles aus, was dort angeklickt wird.
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
@@ -15,8 +19,10 @@ use zbus::Connection;
 use zbus::object_server::SignalEmitter;
 
 use crate::dbus::{self, Notifications, Querencia, grund};
+use crate::einstellung::Position;
 use crate::i18n;
 use crate::modell::{Dringlichkeit, Meldung, Zustand};
+use crate::zentrale::Zentrale;
 use crate::{markup, symbole};
 
 pub const MAX_SICHTBAR: usize = 5;
@@ -42,6 +48,12 @@ button.qb-schliessen {
 }
 button.qb-schliessen:hover { background-color: #e5e1dd; }
 button.qb-aktion { padding: 1px 10px; min-height: 22px; border-radius: 2px; }
+button.qb-hinweis {
+  padding: 0 2px; min-height: 0; min-width: 0;
+  background: none; border: none; box-shadow: none;
+  color: #7a756f; font-size: 0.85em;
+}
+button.qb-hinweis:hover { text-decoration: underline; color: #3c3c3c; }
 "#;
 
 thread_local! {
@@ -57,7 +69,7 @@ pub fn mit_dienst<R>(f: impl FnOnce(&mut Dienst) -> R) -> Option<R> {
 
 /// Führt `f` im nächsten Leerlauf des GTK-Hauptkreises aus, also außerhalb
 /// jedes laufenden Signal-Handlers. Für Klicks, Knöpfe und Zeitgeber.
-fn spaeter(f: impl FnOnce(&mut Dienst) + 'static) {
+pub fn spaeter(f: impl FnOnce(&mut Dienst) + 'static) {
     glib::idle_add_local_once(move || {
         if mit_dienst(f).is_none() {
             dbus::log("Dienst nicht erreichbar (interner Fehler)");
@@ -86,6 +98,8 @@ pub struct Dienst {
     spalte: gtk4::Box,
     sichtbar: Vec<Popup>,
     wartend: VecDeque<Meldung>,
+    /// Fenster der Mitteilungszentrale, beim ersten Zeigen gebaut.
+    zentrale: Option<Zentrale>,
 }
 
 impl Dienst {
@@ -127,6 +141,7 @@ impl Dienst {
             spalte,
             sichtbar: Vec::new(),
             wartend: VecDeque::new(),
+            zentrale: None,
         })
     }
 
@@ -152,8 +167,9 @@ impl Dienst {
         }
     }
 
-    /// Zähler in den gemeinsamen Zustand schreiben und melden.
-    fn zaehler_melden(&self) {
+    /// Zähler in den gemeinsamen Zustand schreiben und `ZustandGeaendert`
+    /// melden.
+    pub fn zaehler_melden(&self) {
         let tupel = {
             let mut z = self.zustand.lock().unwrap_or_else(|e| e.into_inner());
             z.sichtbar = self.sichtbar.len() as u32;
@@ -170,9 +186,10 @@ impl Dienst {
         let id = meldung.id;
         if let Some(index) = self.sichtbar.iter().position(|p| p.meldung.id == id) {
             // Ersatz einer sichtbaren Meldung an derselben Stelle.
+            let hinweis = self.hinweis();
             let alt = &mut self.sichtbar[index];
             alt.meldung = meldung;
-            let kasten = baue_kasten(&alt.meldung);
+            let kasten = baue_kasten(&alt.meldung, hinweis);
             self.spalte.insert_child_after(&kasten, Some(&alt.kasten));
             self.spalte.remove(&alt.kasten);
             alt.kasten = kasten;
@@ -204,8 +221,40 @@ impl Dienst {
         self.zaehler_melden();
     }
 
+    /// Ob Popups den Hinweis „in der Zentrale“ tragen (ini `hinweis=`).
+    fn hinweis(&self) -> bool {
+        self.zustand
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .ein()
+            .hinweis
+    }
+
+    /// Anker und Ränder nach `[Einblendung] position=`; nur solange das
+    /// Fenster versteckt ist (sonst springt der Stapel).
+    fn position_setzen(&self) {
+        let position = self
+            .zustand
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .ein()
+            .position;
+        let (oben, unten, rechts) = match position {
+            Position::ObenRechts => (true, false, true),
+            Position::ObenMitte => (true, false, false),
+            Position::UntenRechts => (false, true, true),
+        };
+        self.fenster.set_anchor(Edge::Top, oben);
+        self.fenster.set_anchor(Edge::Bottom, unten);
+        self.fenster.set_anchor(Edge::Right, rechts);
+        self.fenster.set_anchor(Edge::Left, false);
+        self.spalte.set_margin_top(if oben { 8 } else { 0 });
+        self.spalte.set_margin_bottom(if unten { 8 } else { 0 });
+        self.spalte.set_margin_end(if rechts { 8 } else { 0 });
+    }
+
     fn anzeigen(&mut self, meldung: Meldung) {
-        let kasten = baue_kasten(&meldung);
+        let kasten = baue_kasten(&meldung, self.hinweis());
         self.spalte.append(&kasten);
         dbus::log(&format!(
             "Meldung {} von „{}“ ({}{}): „{}“",
@@ -228,6 +277,7 @@ impl Dienst {
         let index = self.sichtbar.len() - 1;
         self.timer_starten(index);
         if !self.fenster.is_visible() {
+            self.position_setzen();
             self.fenster.present();
         }
     }
@@ -239,7 +289,16 @@ impl Dienst {
         if p.ueberfahren || p.timer.is_some() {
             return;
         }
-        let Some(dauer) = p.meldung.anzeigedauer() else {
+        let dauer_s = self
+            .zustand
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .ein()
+            .dauer_s;
+        let Some(p) = self.sichtbar.get_mut(index) else {
+            return;
+        };
+        let Some(dauer) = p.meldung.anzeigedauer(dauer_s) else {
             return;
         };
         let id = p.meldung.id;
@@ -319,6 +378,219 @@ impl Dienst {
         if !resident {
             self.schliesse(id, grund::GESCHLOSSEN);
         }
+        self.gelesen(vec![id]);
+    }
+
+    /// Schließen-Knopf im Popup: zu (Grund 2) und als gelesen.
+    fn weggeklickt(&mut self, id: u32) {
+        self.schliesse(id, grund::GESCHLOSSEN);
+        self.gelesen(vec![id]);
+    }
+
+    /// Eine Meldung, die nicht erscheinen darf (Nicht stören, Einblendungen
+    /// aus): sofort `NotificationClosed(Grund 1)`, damit Absender wie
+    /// `notify-send --wait` nicht ewig warten. Steht ein älteres Popup mit
+    /// derselben ID (Ersatz), schließt es sich.
+    pub fn unterdrueckt(&mut self, id: u32) {
+        let da = self.sichtbar.iter().any(|p| p.meldung.id == id)
+            || self.wartend.iter().any(|m| m.id == id);
+        if da {
+            self.schliesse(id, grund::ABGELAUFEN);
+        } else {
+            self.signal_geschlossen(id, grund::ABGELAUFEN);
+        }
+    }
+
+    // ------------------------------------------- Mitteilungszentrale
+
+    /// Nach Änderungen am Verlauf von der GTK-Seite: `Geaendert`,
+    /// `Zaehler` (mit `PropertiesChanged`) und die Zentrale auffrischen.
+    fn verlauf_gemeldet(&mut self, ids: Vec<u32>) {
+        let conn = self.conn.clone();
+        let zustand = self.zustand.clone();
+        zbus::block_on(async {
+            dbus::melde_geaendert(&conn, ids).await;
+            dbus::melde_zaehler(&conn, &zustand).await;
+        });
+        self.zentrale_auffrischen();
+    }
+
+    /// Markiert `ids` (leer: alle) als gelesen.
+    fn gelesen(&mut self, ids: Vec<u32>) {
+        let geaendert = {
+            let mut z = self.zustand.lock().unwrap_or_else(|e| e.into_inner());
+            let g = z.verlauf.als_gelesen(&ids);
+            if !g.is_empty() {
+                z.verlauf_sichern();
+            }
+            g
+        };
+        if !geaendert.is_empty() {
+            self.verlauf_gemeldet(geaendert);
+        }
+    }
+
+    pub fn zentrale_als_gelesen(&mut self, ids: Vec<u32>) {
+        self.gelesen(ids);
+    }
+
+    pub fn zentrale_entfernen(&mut self, ids: Vec<u32>) {
+        let weg = {
+            let mut z = self.zustand.lock().unwrap_or_else(|e| e.into_inner());
+            let w = z.verlauf.entfernen(&ids);
+            if !w.is_empty() {
+                z.verlauf_sichern();
+            }
+            w
+        };
+        if weg.is_empty() {
+            return;
+        }
+        dbus::log(&format!(
+            "Zentrale: {} Eintrag/Einträge entfernt",
+            weg.len()
+        ));
+        for id in &weg {
+            self.schliesse(*id, grund::GESCHLOSSEN);
+        }
+        self.verlauf_gemeldet(weg);
+    }
+
+    pub fn zentrale_alle_entfernen(&mut self) {
+        let weg: Vec<u32> = {
+            let mut z = self.zustand.lock().unwrap_or_else(|e| e.into_inner());
+            if z.verlauf.is_empty() {
+                return;
+            }
+            let ids = z.verlauf.eintraege().map(|e| e.id).collect();
+            z.verlauf.leeren();
+            z.verlauf_sichern();
+            ids
+        };
+        dbus::log(&format!("Zentrale: alle {} Einträge entfernt", weg.len()));
+        for id in &weg {
+            self.schliesse(*id, grund::GESCHLOSSEN);
+        }
+        self.verlauf_gemeldet(Vec::new());
+    }
+
+    /// Aktionsknopf in der Zentrale. Steht das Popup noch, gilt dasselbe wie
+    /// dort; sonst nur `ActionInvoked` (der Absender hört evtl. noch zu).
+    pub fn zentrale_aktion(&mut self, id: u32, schluessel: &str) {
+        if self.sichtbar.iter().any(|p| p.meldung.id == id) {
+            self.aktion(id, schluessel);
+            return;
+        }
+        dbus::log(&format!("Zentrale: Meldung {id}, Aktion „{schluessel}“"));
+        self.signal_aktion(id, schluessel);
+        self.gelesen(vec![id]);
+    }
+
+    /// Doppelklick oder Eingabe auf einem Eintrag: Standardaktion, wenn es
+    /// eine gibt und der Absender noch zuhören kann, sonst „als gelesen“.
+    pub fn zentrale_aktivieren(&mut self, id: u32) {
+        let default = self
+            .zustand
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .verlauf
+            .eintrag(id)
+            .is_some_and(|e| e.aus_diesem_lauf && e.aktionen.iter().any(|(k, _)| k == "default"));
+        if default {
+            self.zentrale_aktion(id, "default");
+        } else {
+            self.gelesen(vec![id]);
+        }
+    }
+
+    pub fn zentrale_nicht_stoeren(&mut self, an: bool) {
+        let conn = self.conn.clone();
+        let zustand = self.zustand.clone();
+        zbus::block_on(dbus::nicht_stoeren_setzen(&zustand, an, Some(&conn)));
+    }
+
+    pub fn zentrale_sichtbarkeit(&mut self, offen: bool) {
+        let geaendert = {
+            let mut z = self.zustand.lock().unwrap_or_else(|e| e.into_inner());
+            let g = z.zentrale_offen != offen;
+            z.zentrale_offen = offen;
+            g
+        };
+        if geaendert {
+            dbus::log(&format!(
+                "Mitteilungszentrale {}",
+                if offen { "geöffnet" } else { "geschlossen" }
+            ));
+            let conn = self.conn.clone();
+            zbus::block_on(dbus::melde_zentrale_offen(&conn, offen));
+        }
+        if offen {
+            self.zentrale_auffrischen();
+        }
+    }
+
+    /// Zeigt die Zentrale (baut sie beim ersten Mal).
+    pub fn zentrale_zeigen(&mut self, token: &str) {
+        let log = self
+            .zustand
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .einstellungen_auffrischen();
+        for zeile in log {
+            dbus::log(&zeile);
+        }
+        if self.zentrale.is_none() {
+            self.zentrale = Some(Zentrale::neu());
+        }
+        self.zentrale_fuellen();
+        if let Some(z) = &self.zentrale {
+            z.zeigen(token);
+        }
+    }
+
+    /// Das Fenster der Zentrale wurde geschlossen (und zerstört).
+    pub fn zentrale_zu(&mut self) {
+        self.zentrale = None;
+        self.zentrale_sichtbarkeit(false);
+    }
+
+    pub fn zentrale_schliessen(&mut self) {
+        if let Some(z) = self.zentrale.as_ref().filter(|z| z.sichtbar()) {
+            z.fenster.close();
+        }
+    }
+
+    /// Baut die Liste neu, wenn die Zentrale offen ist.
+    pub fn zentrale_auffrischen(&mut self) {
+        if self.zentrale.as_ref().is_some_and(|z| z.sichtbar()) {
+            self.zentrale_fuellen();
+        }
+    }
+
+    fn zentrale_fuellen(&self) {
+        let Some(zentrale) = &self.zentrale else {
+            return;
+        };
+        let (eintraege, nicht_stoeren) = {
+            let z = self.zustand.lock().unwrap_or_else(|e| e.into_inner());
+            (
+                z.verlauf.eintraege().cloned().collect::<Vec<_>>(),
+                z.nicht_stoeren,
+            )
+        };
+        let angezeigt = zentrale.fuellen(&eintraege, nicht_stoeren);
+        if std::env::var_os("QB_DEBUG").is_some() {
+            dbus::log(&format!(
+                "Zentrale: {angezeigt} von {} Einträgen angezeigt",
+                eintraege.len()
+            ));
+        }
+    }
+
+    /// Hinweis „in der Zentrale“ im Popup: Zentrale öffnen, Popup zu.
+    fn hinweis_geklickt(&mut self, id: u32) {
+        self.schliesse(id, grund::GESCHLOSSEN);
+        self.zentrale_zeigen("");
     }
 
     /// Klick auf den Kasten: Default-Aktion, sonst schließen.
@@ -329,12 +601,12 @@ impl Dienst {
         if p.meldung.hat_default_aktion() {
             self.aktion(id, "default");
         } else {
-            self.schliesse(id, grund::GESCHLOSSEN);
+            self.weggeklickt(id);
         }
     }
 }
 
-fn baue_kasten(m: &Meldung) -> gtk4::Box {
+fn baue_kasten(m: &Meldung, hinweis: bool) -> gtk4::Box {
     let id = m.id;
     let kasten = gtk4::Box::new(gtk4::Orientation::Horizontal, 10);
     kasten.add_css_class("qb-meldung");
@@ -373,7 +645,7 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
     // TRANSLATORS: Tooltip des Schließen-Knopfs oben rechts in jedem Popup.
     schliessen.set_tooltip_text(Some(&i18n::gettext("Close")));
     schliessen.set_can_focus(false);
-    schliessen.connect_clicked(move |_| spaeter(move |d| d.schliesse(id, grund::GESCHLOSSEN)));
+    schliessen.connect_clicked(move |_| spaeter(move |d| d.weggeklickt(id)));
     kopf.append(&schliessen);
     inhalt.append(&kopf);
 
@@ -403,6 +675,9 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
         inhalt.append(&text);
     }
 
+    // Fußzeile: Programmname links, Hinweis „in der Zentrale“ rechts (nicht
+    // bei transient: die Meldung kommt nicht in den Verlauf).
+    let fuss = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
     if !m.app_name.is_empty() && !m.summary.is_empty() {
         let app = gtk4::Label::new(Some(&m.app_name));
         app.add_css_class("qb-app");
@@ -410,7 +685,23 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
         app.set_width_chars(10);
         app.set_max_width_chars(30);
         app.set_ellipsize(gtk4::pango::EllipsizeMode::End);
-        inhalt.append(&app);
+        app.set_hexpand(true);
+        fuss.append(&app);
+    }
+    if hinweis && !m.transient {
+        // TRANSLATORS: kleiner Hinweis unten rechts im Popup; ein Klick
+        // öffnet die Mitteilungszentrale, in der die Meldung gespeichert ist.
+        let knopf = gtk4::Button::with_label(&i18n::gettext("in the notification center"));
+        knopf.add_css_class("qb-hinweis");
+        knopf.set_tooltip_text(Some(&i18n::gettext("Open the notification center")));
+        knopf.set_can_focus(false);
+        knopf.set_halign(gtk4::Align::End);
+        knopf.set_hexpand(true);
+        knopf.connect_clicked(move |_| spaeter(move |d| d.hinweis_geklickt(id)));
+        fuss.append(&knopf);
+    }
+    if fuss.first_child().is_some() {
+        inhalt.append(&fuss);
     }
 
     let knoepfe: Vec<_> = m.knopf_aktionen().collect();

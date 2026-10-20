@@ -7,6 +7,7 @@
   bild.py <png> letzte-helle-zeile X    -> y der letzten solchen Zeile
   bild.py <png> linke-kante Y           -> x der ersten nicht-hellen Spalte von rechts in Zeile Y
   bild.py <png> orange-rechts           -> Anzahl Pixel in Akzentfarbe (#F07746-nah) in den rechten 400 Spalten
+  bild.py <png> popup-pixel X0 Y0 X1 Y1 -> Anzahl Pixel in Popup-Farbe (#F9F8F6-nah) im Rechteck (0.2.0)
 """
 import struct
 import sys
@@ -70,6 +71,15 @@ def main():
                 print(y)
                 return
         print(-1)
+    elif cmd == 'popup-pixel':
+        x0, y0, x1, y1 = (int(v) for v in sys.argv[3:7])
+        n = 0
+        for y in range(max(y0, 0), min(y1, h)):
+            for x in range(max(x0, 0), min(x1, w)):
+                r, g, b = px(x, y)
+                if abs(r - 249) <= 3 and abs(g - 248) <= 3 and abs(b - 246) <= 3:
+                    n += 1
+        print(n)
     elif cmd == 'letzte-helle-zeile':
         x = int(sys.argv[3])
         letzte = -1

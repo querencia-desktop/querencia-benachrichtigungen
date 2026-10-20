@@ -1,0 +1,24 @@
+[Desktop Entry]
+# Mitteilungszentrale von Querencia Benachrichtigungen (0.2.0). Desktop-ID =
+# Programmname des Dienstes (org.querencia.Benachrichtigungen), damit labwc
+# und die Fensterliste das Fenster der Zentrale dieser Datei zuordnen.
+# Vorlage: Name, Comment und Keywords sind englisch; die Übersetzungen
+# (Name[de]= …) setzt `werkzeug/i18n.py desktop` aus po/*.po ein (entspricht
+# msgfmt --desktop). Erzeugt: org.querencia.Benachrichtigungen.desktop. Die
+# Integration ersetzt Exec/TryExec durch den Pfad der Ablage. Symbol aus dem
+# Querencia-Symbolthema (preferences-desktop-notification).
+Type=Application
+Version=1.5
+Name[de]=Mitteilungszentrale
+Name=Notification Center
+Comment[de]=Letzte Mitteilungen ansehen und verwalten
+Comment=Show and manage recent notifications
+Exec=querencia-benachrichtigungen --zentrale
+TryExec=querencia-benachrichtigungen
+Icon=preferences-desktop-notification
+Terminal=false
+Categories=GTK;Utility;
+Keywords[de]=Mitteilungen;Benachrichtigungen;Nachrichten;Verlauf;Nicht stören;
+Keywords=Notifications;Messages;History;Do Not Disturb;
+StartupNotify=true
+StartupWMClass=org.querencia.Benachrichtigungen

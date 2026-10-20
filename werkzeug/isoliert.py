@@ -95,7 +95,8 @@ def main() -> int:
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("WAYLAND", "DBUS", "DISPLAY", "XDG_", "LABWC", "SWAYSOCK"))}
     env.update({
-        "HOME": os.path.expanduser("~"),
+        # 0.2.0: HMP04_HOME setzt ein eigenes HOME (Wegwerfordner im Profil).
+        "HOME": os.environ.get("HMP04_HOME") or os.path.expanduser("~"),
         "XDG_RUNTIME_DIR": runtime,
         "XDG_CONFIG_HOME": os.path.join(profile, "config"),
         "XDG_DATA_HOME": os.path.join(profile, "data"),

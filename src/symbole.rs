@@ -9,6 +9,7 @@ use gtk4::prelude::*;
 use gtk4::{gdk, gdk_pixbuf, glib};
 
 use crate::modell::{BildDaten, Dringlichkeit, Meldung};
+use crate::verlauf::Eintrag;
 
 pub const GROESSE: i32 = 48;
 
@@ -54,35 +55,59 @@ pub fn klassisches_thema_verwenden() {
 
 /// Das Symbol-Widget für eine Meldung, immer `GROESSE` × `GROESSE`.
 pub fn widget(m: &Meldung) -> gtk4::Widget {
-    if let Some(w) = m.bild_daten.as_ref().and_then(aus_daten) {
+    widget_aus(
+        m.bild_daten.as_ref(),
+        &[m.bild_pfad.as_deref().unwrap_or(""), m.app_icon.as_str()],
+        m.desktop_entry.as_deref(),
+        m.dringlichkeit,
+        GROESSE,
+    )
+}
+
+/// Symbol eines Verlaufseintrags in der Zentrale, `groesse` × `groesse`.
+pub fn widget_eintrag(e: &Eintrag, groesse: i32) -> gtk4::Widget {
+    widget_aus(
+        e.bild_daten.as_ref(),
+        &[e.bild_pfad.as_str(), e.app_icon.as_str()],
+        Some(e.desktop_entry.as_str()).filter(|d| !d.is_empty()),
+        e.dringlichkeit(),
+        groesse,
+    )
+}
+
+/// Reihenfolge: Bilddaten, Angaben (Pfad, URI oder Themenname), Symbol des
+/// `.desktop`-Eintrags, Standardsymbol nach Dringlichkeit.
+fn widget_aus(
+    daten: Option<&BildDaten>,
+    angaben: &[&str],
+    desktop_entry: Option<&str>,
+    dringlichkeit: Dringlichkeit,
+    groesse: i32,
+) -> gtk4::Widget {
+    if let Some(w) = daten.and_then(|b| aus_daten(b, groesse)) {
         return w;
     }
-    for angabe in [m.bild_pfad.as_deref(), Some(m.app_icon.as_str())]
-        .into_iter()
-        .flatten()
-    {
-        if let Some(w) = aus_angabe(angabe) {
+    for angabe in angaben {
+        if let Some(w) = aus_angabe(angabe, groesse) {
             return w;
         }
     }
-    if let Some(w) = m
-        .desktop_entry
-        .as_deref()
+    if let Some(w) = desktop_entry
         .and_then(|id| desktop_symbol(id, &datenverzeichnisse()))
-        .and_then(|name| aus_angabe(&name))
+        .and_then(|name| aus_angabe(&name, groesse))
     {
         return w;
     }
-    let name = match m.dringlichkeit {
+    let name = match dringlichkeit {
         Dringlichkeit::Kritisch => "dialog-warning",
         _ => "dialog-information",
     };
-    themensymbol(name).unwrap_or_else(|| {
-        themensymbol("image-missing").unwrap_or_else(|| gtk4::Image::new().upcast())
+    themensymbol(name, groesse).unwrap_or_else(|| {
+        themensymbol("image-missing", groesse).unwrap_or_else(|| gtk4::Image::new().upcast())
     })
 }
 
-fn aus_daten(b: &BildDaten) -> Option<gtk4::Widget> {
+fn aus_daten(b: &BildDaten, groesse: i32) -> Option<gtk4::Widget> {
     if !b.plausibel() {
         return None;
     }
@@ -99,18 +124,18 @@ fn aus_daten(b: &BildDaten) -> Option<gtk4::Widget> {
         b.hoehe,
         b.zeilenlaenge,
     );
-    verkleinert(&pixbuf).map(bild)
+    verkleinert(&pixbuf, groesse).map(|p| bild(p, groesse))
 }
 
-/// Verkleinert auf höchstens GROESSE × GROESSE (Seitenverhältnis bleibt);
-/// kleinere Bilder bleiben, wie sie sind.
-fn verkleinert(pixbuf: &gdk_pixbuf::Pixbuf) -> Option<gdk::Paintable> {
+/// Verkleinert auf höchstens `groesse` × `groesse` (Seitenverhältnis
+/// bleibt); kleinere Bilder bleiben, wie sie sind.
+fn verkleinert(pixbuf: &gdk_pixbuf::Pixbuf, groesse: i32) -> Option<gdk::Paintable> {
     let (b, h) = (pixbuf.width(), pixbuf.height());
     if b <= 0 || h <= 0 {
         return None;
     }
-    let skaliert = if b > GROESSE || h > GROESSE {
-        let (zb, zh) = zielmasse(b, h, GROESSE);
+    let skaliert = if b > groesse || h > groesse {
+        let (zb, zh) = zielmasse(b, h, groesse);
         pixbuf.scale_simple(zb, zh, gdk_pixbuf::InterpType::Bilinear)?
     } else {
         pixbuf.clone()
@@ -128,18 +153,18 @@ pub fn zielmasse(b: i32, h: i32, max: i32) -> (i32, i32) {
 }
 
 /// Pfad, `file://`-URI oder Themensymbolname.
-fn aus_angabe(angabe: &str) -> Option<gtk4::Widget> {
+fn aus_angabe(angabe: &str, groesse: i32) -> Option<gtk4::Widget> {
     let angabe = angabe.trim();
     if angabe.is_empty() {
         return None;
     }
     match pfad_aus_angabe(angabe) {
-        // Beim Laden schon auf GROESSE begrenzen (auch große PNGs/SVGs).
-        Some(pfad) => gdk_pixbuf::Pixbuf::from_file_at_scale(&pfad, GROESSE, GROESSE, true)
+        // Beim Laden schon auf die Größe begrenzen (auch große PNGs/SVGs).
+        Some(pfad) => gdk_pixbuf::Pixbuf::from_file_at_scale(&pfad, groesse, groesse, true)
             .ok()
-            .and_then(|p| verkleinert(&p))
-            .map(bild),
-        None => themensymbol(angabe),
+            .and_then(|p| verkleinert(&p, groesse))
+            .map(|p| bild(p, groesse)),
+        None => themensymbol(angabe, groesse),
     }
 }
 
@@ -163,7 +188,7 @@ pub fn pfad_aus_angabe(angabe: &str) -> Option<PathBuf> {
     None
 }
 
-fn themensymbol(name: &str) -> Option<gtk4::Widget> {
+fn themensymbol(name: &str, groesse: i32) -> Option<gtk4::Widget> {
     let display = gdk::Display::default()?;
     let thema = gtk4::IconTheme::for_display(&display);
     // Ein Name mit Endung (`foo.png`, von notify-send -i) wird ohne Endung gesucht.
@@ -175,16 +200,16 @@ fn themensymbol(name: &str) -> Option<gtk4::Widget> {
         return None;
     }
     let image = gtk4::Image::from_icon_name(name);
-    image.set_pixel_size(GROESSE);
+    image.set_pixel_size(groesse);
     image.set_valign(gtk4::Align::Start);
     Some(image.upcast())
 }
 
-fn bild(paintable: gdk::Paintable) -> gtk4::Widget {
+fn bild(paintable: gdk::Paintable, groesse: i32) -> gtk4::Widget {
     let picture = gtk4::Picture::for_paintable(&paintable);
     picture.set_can_shrink(true);
     picture.set_content_fit(gtk4::ContentFit::Contain);
-    picture.set_size_request(GROESSE, GROESSE);
+    picture.set_size_request(groesse, groesse);
     picture.set_halign(gtk4::Align::Center);
     picture.set_valign(gtk4::Align::Start);
     picture.set_hexpand(false);

@@ -1,13 +1,16 @@
-//! Datenmodell des Dienstes: Meldung mit Hints, Dringlichkeit, Anzeigedauer,
-//! Verlauf (letzte 50 Meldungen) und der von D-Bus- und GTK-Seite gemeinsam
-//! benutzte Zustand. Alles hier läuft ohne Display und ist in Unit-Tests
+//! Datenmodell des Dienstes: Meldung mit Hints, Dringlichkeit, Anzeigedauer
+//! und der von D-Bus- und GTK-Seite gemeinsam benutzte Zustand (mit Verlauf
+//! und Einstellungen). Alles hier läuft ohne Display und ist in Unit-Tests
 //! prüfbar.
 
-use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::time::Duration;
 
 use zbus::zvariant::{OwnedValue, Value};
+
+use crate::einstellung::{self, Einstellungen};
+use crate::verlauf::Verlauf;
 
 /// Dringlichkeit nach Spezifikation (Hint `urgency`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -73,6 +76,61 @@ impl BildDaten {
         let noetig = (self.hoehe as usize - 1) * self.zeilenlaenge as usize
             + (self.breite * kanaele) as usize;
         self.daten.len() >= noetig
+    }
+
+    /// Verkleinert auf höchstens `max` × `max` (Seitenverhältnis bleibt,
+    /// Mittelwert je Zielpixel), ohne GTK. Kleinere Bilder bleiben, wie sie
+    /// sind. Für den Verlauf, damit große `image-data` (Electron schickt
+    /// 512 × 512) nicht 200-mal im Speicher liegen.
+    pub fn verkleinert(&self, max: i32) -> Option<Self> {
+        if !self.plausibel() || max <= 0 {
+            return None;
+        }
+        if self.breite <= max && self.hoehe <= max {
+            return Some(self.clone());
+        }
+        let (zb, zh) = if self.breite >= self.hoehe {
+            (
+                max,
+                (self.hoehe as i64 * max as i64 / self.breite as i64).max(1) as i32,
+            )
+        } else {
+            (
+                (self.breite as i64 * max as i64 / self.hoehe as i64).max(1) as i32,
+                max,
+            )
+        };
+        let k = self.kanaele as usize;
+        let mut daten = Vec::with_capacity((zb * zh) as usize * k);
+        for y in 0..zh {
+            let y0 = (y as i64 * self.hoehe as i64 / zh as i64) as usize;
+            let y1 = (((y + 1) as i64 * self.hoehe as i64 / zh as i64) as usize).max(y0 + 1);
+            for x in 0..zb {
+                let x0 = (x as i64 * self.breite as i64 / zb as i64) as usize;
+                let x1 = (((x + 1) as i64 * self.breite as i64 / zb as i64) as usize).max(x0 + 1);
+                let mut summe = [0u64; 4];
+                for yy in y0..y1 {
+                    let zeile = yy * self.zeilenlaenge as usize;
+                    for xx in x0..x1 {
+                        let p = zeile + xx * k;
+                        for (c, s) in summe.iter_mut().enumerate().take(k) {
+                            *s += self.daten[p + c] as u64;
+                        }
+                    }
+                }
+                let n = ((y1 - y0) * (x1 - x0)) as u64;
+                daten.extend(summe.iter().take(k).map(|s| (s / n) as u8));
+            }
+        }
+        Some(Self {
+            breite: zb,
+            hoehe: zh,
+            zeilenlaenge: zb * self.kanaele,
+            alpha: self.alpha,
+            bits_je_kanal: 8,
+            kanaele: self.kanaele,
+            daten,
+        })
     }
 }
 
@@ -141,23 +199,38 @@ impl Meldung {
     }
 
     /// Wie lange das Popup steht; `None` heißt: bis es geschlossen wird.
-    pub fn anzeigedauer(&self) -> Option<Duration> {
-        anzeigedauer(self.dringlichkeit, self.expire_timeout)
+    /// `dauer_s` ist die Standarddauer normaler Meldungen aus der ini.
+    pub fn anzeigedauer(&self, dauer_s: u32) -> Option<Duration> {
+        anzeigedauer(self.dringlichkeit, self.expire_timeout, dauer_s)
     }
 }
 
 /// Anzeigedauer nach Dringlichkeit und `expire_timeout` (Millisekunden):
 /// kritische Meldungen bleiben immer stehen; 0 heißt „nie ablaufen“; ein
 /// positiver Wert gilt; -1 (oder jeder andere negative Wert) nimmt den
-/// Standard: 3 s bei niedriger, 5 s bei normaler Dringlichkeit.
-pub fn anzeigedauer(dringlichkeit: Dringlichkeit, expire_timeout: i32) -> Option<Duration> {
+/// Standard: `dauer_s` bei normaler, drei Fünftel davon (mindestens 1 s) bei
+/// niedriger Dringlichkeit – mit der Vorgabe 5 s also 5 und 3 s wie bis
+/// 0.1.3. `dauer_s` = 0 heißt auch hier „bis geschlossen“.
+pub fn anzeigedauer(
+    dringlichkeit: Dringlichkeit,
+    expire_timeout: i32,
+    dauer_s: u32,
+) -> Option<Duration> {
     match dringlichkeit {
         Dringlichkeit::Kritisch => None,
         _ if expire_timeout == 0 => None,
         _ if expire_timeout > 0 => Some(Duration::from_millis(expire_timeout as u64)),
-        Dringlichkeit::Niedrig => Some(Duration::from_secs(3)),
-        Dringlichkeit::Normal => Some(Duration::from_secs(5)),
+        _ if dauer_s == 0 => None,
+        Dringlichkeit::Niedrig => Some(Duration::from_secs(((dauer_s * 3 + 2) / 5).max(1) as u64)),
+        Dringlichkeit::Normal => Some(Duration::from_secs(dauer_s as u64)),
     }
+}
+
+/// Ob eine Meldung als Popup erscheint: kritische immer, sonst nur ohne
+/// „Nicht stören“ und mit `[Einblendung] anzeigen=ja`. In den Verlauf kommt
+/// sie in jedem Fall (außer `transient`).
+pub fn einblenden(dringlichkeit: Dringlichkeit, nicht_stoeren: bool, e: &Einstellungen) -> bool {
+    dringlichkeit == Dringlichkeit::Kritisch || (!nicht_stoeren && e.anzeigen)
 }
 
 /// Die flache Aktionsliste der Spezifikation in Paare; ein überzähliges
@@ -244,88 +317,6 @@ fn bild_aus_wert(v: &Value<'_>) -> Option<BildDaten> {
     bild.plausibel().then_some(bild)
 }
 
-/// Ein Eintrag des Verlaufs.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Eintrag {
-    pub id: u32,
-    pub app_name: String,
-    pub app_icon: String,
-    pub summary: String,
-    pub body: String,
-    pub dringlichkeit: Dringlichkeit,
-    pub zeit: i64,
-}
-
-impl Eintrag {
-    pub fn aus(m: &Meldung) -> Self {
-        Self {
-            id: m.id,
-            app_name: m.app_name.clone(),
-            app_icon: m.app_icon.clone(),
-            summary: m.summary.clone(),
-            body: m.body.clone(),
-            dringlichkeit: m.dringlichkeit,
-            zeit: m.zeit,
-        }
-    }
-
-    /// Form für D-Bus: (u id, s app, s symbol, s betreff, s text, y dringlichkeit, x zeit).
-    pub fn als_tupel(&self) -> (u32, String, String, String, String, u8, i64) {
-        (
-            self.id,
-            self.app_name.clone(),
-            self.app_icon.clone(),
-            self.summary.clone(),
-            self.body.clone(),
-            self.dringlichkeit.als_byte(),
-            self.zeit,
-        )
-    }
-}
-
-/// Die letzten `KAPAZITAET` Meldungen, älteste zuerst. Ein Ersatz
-/// (`replaces_id`) aktualisiert den vorhandenen Eintrag an seiner Stelle.
-#[derive(Debug, Default)]
-pub struct Verlauf {
-    eintraege: VecDeque<Eintrag>,
-}
-
-pub const KAPAZITAET: usize = 50;
-
-impl Verlauf {
-    pub fn merke(&mut self, m: &Meldung) {
-        if m.transient {
-            return;
-        }
-        let neu = Eintrag::aus(m);
-        if let Some(alt) = self.eintraege.iter_mut().find(|e| e.id == m.id) {
-            *alt = neu;
-            return;
-        }
-        if self.eintraege.len() == KAPAZITAET {
-            self.eintraege.pop_front();
-        }
-        self.eintraege.push_back(neu);
-    }
-
-    pub fn eintraege(&self) -> impl Iterator<Item = &Eintrag> {
-        self.eintraege.iter()
-    }
-
-    pub fn len(&self) -> usize {
-        self.eintraege.len()
-    }
-
-    #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
-        self.eintraege.is_empty()
-    }
-
-    pub fn leeren(&mut self) {
-        self.eintraege.clear();
-    }
-}
-
 /// Gemeinsamer Zustand von D-Bus-Seite (zbus-Ausführer) und GTK-Seite.
 #[derive(Debug)]
 pub struct Zustand {
@@ -338,19 +329,93 @@ pub struct Zustand {
     pub wartend: u32,
     /// Datei, deren Vorhandensein „Nicht stören“ über Neustarts hält.
     pub nicht_stoeren_datei: Option<PathBuf>,
+    /// JSON-Datei des Verlaufs (`None`: nur im Speicher, Tests).
+    pub verlauf_datei: Option<PathBuf>,
+    pub einstellungen: einstellung::Quelle,
+    /// Ob das Fenster der Mitteilungszentrale gerade offen ist.
+    pub zentrale_offen: bool,
+}
+
+/// Ablageorte des Zustands; `None` heißt jeweils: nur im Speicher.
+#[derive(Debug, Default)]
+pub struct Orte {
+    pub nicht_stoeren: Option<PathBuf>,
+    pub verlauf: Option<PathBuf>,
+    pub ini: Option<PathBuf>,
 }
 
 impl Zustand {
-    pub fn neu(nicht_stoeren_datei: Option<PathBuf>) -> Self {
-        let nicht_stoeren = nicht_stoeren_datei.as_ref().is_some_and(|p| p.exists());
-        Self {
-            naechste_id: 1,
-            nicht_stoeren,
-            verlauf: Verlauf::default(),
-            aktiv: BTreeSet::new(),
-            sichtbar: 0,
-            wartend: 0,
-            nicht_stoeren_datei,
+    /// Liest „Nicht stören“, Einstellungen und Verlauf. Die Texte im zweiten
+    /// Wert sind fürs Log.
+    pub fn neu(orte: Orte) -> (Self, Vec<String>) {
+        let nicht_stoeren = orte.nicht_stoeren.as_ref().is_some_and(|p| p.exists());
+        let einstellungen = einstellung::Quelle::neu(orte.ini);
+        let mut log = Vec::new();
+        let verlauf = match &orte.verlauf {
+            Some(p) => {
+                let (v, hinweis) = Verlauf::laden(p, einstellungen.werte.verlauf);
+                log.extend(hinweis);
+                log.push(format!(
+                    "Verlauf {}: {} Einträge, {} ungelesen (höchstens {})",
+                    p.display(),
+                    v.len(),
+                    v.ungelesen(),
+                    v.kapazitaet()
+                ));
+                v
+            }
+            None => Verlauf::neu(einstellungen.werte.verlauf),
+        };
+        // IDs aus dem gespeicherten Verlauf nicht wieder vergeben.
+        let naechste_id = verlauf
+            .hoechste_id()
+            .checked_add(1)
+            .filter(|&n| n != 0)
+            .unwrap_or(1);
+        (
+            Self {
+                naechste_id,
+                nicht_stoeren,
+                verlauf,
+                aktiv: BTreeSet::new(),
+                sichtbar: 0,
+                wartend: 0,
+                nicht_stoeren_datei: orte.nicht_stoeren,
+                verlauf_datei: orte.verlauf,
+                einstellungen,
+                zentrale_offen: false,
+            },
+            log,
+        )
+    }
+
+    pub fn ein(&self) -> &Einstellungen {
+        &self.einstellungen.werte
+    }
+
+    /// Liest die ini neu, falls sie sich geändert hat, und passt die Größe
+    /// des Verlaufs an. Liefert Texte fürs Log.
+    pub fn einstellungen_auffrischen(&mut self) -> Vec<String> {
+        let log = self.einstellungen.auffrischen();
+        if !log.is_empty()
+            && self
+                .verlauf
+                .setze_kapazitaet(self.einstellungen.werte.verlauf)
+        {
+            self.verlauf_sichern();
+        }
+        log
+    }
+
+    /// Schreibt den Verlauf in seine Datei (Fehler nur ins Log).
+    pub fn verlauf_sichern(&self) {
+        if let Some(p) = &self.verlauf_datei
+            && let Err(e) = self.verlauf.speichern(p)
+        {
+            eprintln!(
+                "querencia-benachrichtigungen: Verlauf nicht gespeichert ({}): {e}",
+                p.display()
+            );
         }
     }
 
@@ -426,38 +491,38 @@ mod tests {
     #[test]
     fn anzeigedauer_standardwerte() {
         assert_eq!(
-            anzeigedauer(Dringlichkeit::Normal, -1),
+            anzeigedauer(Dringlichkeit::Normal, -1, 5),
             Some(Duration::from_secs(5))
         );
         assert_eq!(
-            anzeigedauer(Dringlichkeit::Niedrig, -1),
+            anzeigedauer(Dringlichkeit::Niedrig, -1, 5),
             Some(Duration::from_secs(3))
         );
-        assert_eq!(anzeigedauer(Dringlichkeit::Kritisch, -1), None);
+        assert_eq!(anzeigedauer(Dringlichkeit::Kritisch, -1, 5), None);
     }
 
     #[test]
     fn anzeigedauer_explizit() {
         assert_eq!(
-            anzeigedauer(Dringlichkeit::Normal, 1500),
+            anzeigedauer(Dringlichkeit::Normal, 1500, 5),
             Some(Duration::from_millis(1500))
         );
         assert_eq!(
-            anzeigedauer(Dringlichkeit::Niedrig, 10_000),
+            anzeigedauer(Dringlichkeit::Niedrig, 10_000, 5),
             Some(Duration::from_secs(10))
         );
         assert_eq!(
-            anzeigedauer(Dringlichkeit::Normal, 0),
+            anzeigedauer(Dringlichkeit::Normal, 0, 5),
             None,
             "0 = nie ablaufen"
         );
         assert_eq!(
-            anzeigedauer(Dringlichkeit::Kritisch, 2000),
+            anzeigedauer(Dringlichkeit::Kritisch, 2000, 5),
             None,
             "kritisch bleibt stehen"
         );
         assert_eq!(
-            anzeigedauer(Dringlichkeit::Normal, -7),
+            anzeigedauer(Dringlichkeit::Normal, -7, 5),
             Some(Duration::from_secs(5)),
             "negativ = Standard"
         );
@@ -588,54 +653,107 @@ mod tests {
     }
 
     #[test]
-    fn verlauf_haelt_hoechstens_50() {
-        let mut v = Verlauf::default();
-        for i in 1..=60 {
-            v.merke(&meldung(i, Dringlichkeit::Normal, -1));
+    fn anzeigedauer_aus_der_ini() {
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Normal, -1, 10),
+            Some(Duration::from_secs(10))
+        );
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Niedrig, -1, 10),
+            Some(Duration::from_secs(6))
+        );
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Niedrig, -1, 1),
+            Some(Duration::from_secs(1))
+        );
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Normal, -1, 0),
+            None,
+            "0 = bis geschlossen"
+        );
+        assert_eq!(
+            anzeigedauer(Dringlichkeit::Normal, 1500, 0),
+            Some(Duration::from_millis(1500)),
+            "Absender gewinnt"
+        );
+    }
+
+    #[test]
+    fn einblenden_nach_nicht_stoeren_und_ini() {
+        let an = Einstellungen::default();
+        let aus = Einstellungen {
+            anzeigen: false,
+            ..Einstellungen::default()
+        };
+        assert!(einblenden(Dringlichkeit::Normal, false, &an));
+        assert!(!einblenden(Dringlichkeit::Normal, true, &an));
+        assert!(!einblenden(Dringlichkeit::Niedrig, false, &aus));
+        // kritisch immer
+        assert!(einblenden(Dringlichkeit::Kritisch, true, &an));
+        assert!(einblenden(Dringlichkeit::Kritisch, true, &aus));
+    }
+
+    #[test]
+    fn bild_verkleinern_ohne_gtk() {
+        let gross = BildDaten {
+            breite: 512,
+            hoehe: 256,
+            zeilenlaenge: 512 * 4,
+            alpha: true,
+            bits_je_kanal: 8,
+            kanaele: 4,
+            daten: vec![200; 512 * 256 * 4],
+        };
+        let k = gross.verkleinert(48).expect("Bild");
+        assert_eq!((k.breite, k.hoehe, k.zeilenlaenge), (48, 24, 192));
+        assert_eq!(k.daten.len(), 48 * 24 * 4);
+        assert!(k.plausibel());
+        assert!(k.daten.iter().all(|&b| b == 200));
+        // RGB mit Zeilenpolster, hochkant
+        let mut daten = vec![0u8; 100 * 304];
+        for z in daten.chunks_mut(304) {
+            z[..300].fill(10);
         }
-        assert_eq!(v.len(), KAPAZITAET);
-        let ids: Vec<u32> = v.eintraege().map(|e| e.id).collect();
-        assert_eq!(ids.first(), Some(&11));
-        assert_eq!(ids.last(), Some(&60));
+        let rgb = BildDaten {
+            breite: 100,
+            hoehe: 100,
+            zeilenlaenge: 304,
+            alpha: false,
+            bits_je_kanal: 8,
+            kanaele: 3,
+            daten,
+        };
+        let k = rgb.verkleinert(30).expect("Bild");
+        assert_eq!((k.breite, k.hoehe, k.kanaele), (30, 30, 3));
+        assert!(
+            k.daten.iter().all(|&b| b == 10),
+            "Polster nicht mitgemittelt"
+        );
+        let klein = rgb.verkleinert(200).expect("Bild");
+        assert_eq!(klein, rgb, "kleinere bleiben");
     }
 
     #[test]
-    fn verlauf_ersatz_aktualisiert_an_ort_und_stelle() {
+    fn zustand_vergibt_ids_nach_dem_gespeicherten_verlauf() {
+        let dir = std::env::temp_dir().join(format!("qb-zustand-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let pfad = dir.join("benachrichtigungen.json");
         let mut v = Verlauf::default();
-        v.merke(&meldung(1, Dringlichkeit::Normal, -1));
-        v.merke(&meldung(2, Dringlichkeit::Normal, -1));
-        let mut ersatz = meldung(1, Dringlichkeit::Kritisch, -1);
-        ersatz.summary = "Neu".into();
-        v.merke(&ersatz);
-        let e: Vec<_> = v.eintraege().collect();
-        assert_eq!(e.len(), 2);
-        assert_eq!(e[0].id, 1);
-        assert_eq!(e[0].summary, "Neu");
-        assert_eq!(e[0].dringlichkeit, Dringlichkeit::Kritisch);
-    }
-
-    #[test]
-    fn verlauf_ohne_transiente() {
-        let mut v = Verlauf::default();
-        let mut m = meldung(1, Dringlichkeit::Normal, -1);
-        m.transient = true;
-        v.merke(&m);
-        assert!(v.is_empty());
-    }
-
-    #[test]
-    fn eintrag_tupel() {
-        let m = meldung(5, Dringlichkeit::Niedrig, -1);
-        let t = Eintrag::aus(&m).als_tupel();
-        assert_eq!(t.0, 5);
-        assert_eq!(t.3, "Betreff 5");
-        assert_eq!(t.5, 0);
-        assert_eq!(t.6, 1005);
+        v.merke(&meldung(41, Dringlichkeit::Normal, -1));
+        v.speichern(&pfad).expect("speichern");
+        let (mut z, log) = Zustand::neu(Orte {
+            verlauf: Some(pfad.clone()),
+            ..Orte::default()
+        });
+        assert!(log.iter().any(|l| l.contains("1 Einträge")), "{log:?}");
+        assert_eq!(z.neue_id(), 42);
+        assert_eq!(z.verlauf.len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn ids_beginnen_bei_1_und_ueberspringen_0() {
-        let mut z = Zustand::neu(None);
+        let (mut z, _) = Zustand::neu(Orte::default());
         assert_eq!(z.neue_id(), 1);
         assert_eq!(z.neue_id(), 2);
         z.naechste_id = u32::MAX;
@@ -648,12 +766,16 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("qb-test-{}", std::process::id()));
         let datei = dir.join("nicht-stoeren");
         let _ = std::fs::remove_dir_all(&dir);
-        let mut z = Zustand::neu(Some(datei.clone()));
+        let orte = || Orte {
+            nicht_stoeren: Some(datei.clone()),
+            ..Orte::default()
+        };
+        let (mut z, _) = Zustand::neu(orte());
         assert!(!z.nicht_stoeren);
         assert!(z.setze_nicht_stoeren(true));
         assert!(datei.exists());
         assert!(!z.setze_nicht_stoeren(true), "keine Änderung");
-        let z2 = Zustand::neu(Some(datei.clone()));
+        let (z2, _) = Zustand::neu(orte());
         assert!(z2.nicht_stoeren, "nach Neustart noch an");
         assert!(z.setze_nicht_stoeren(false));
         assert!(!datei.exists());

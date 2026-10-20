@@ -1,19 +1,23 @@
 //! Querencia Benachrichtigungen: Dienst für Desktop-Benachrichtigungen nach der
 //! Freedesktop-Spezifikation (org.freedesktop.Notifications) mit klassischen
-//! Popups oben rechts (gtk4-layer-shell) und „Nicht stören“ über
-//! org.querencia.Benachrichtigungen.
+//! Popups (gtk4-layer-shell), Mitteilungszentrale mit Verlauf und „Nicht
+//! stören“ über org.querencia.Benachrichtigungen (docs/dbus.md).
 //!
 //!   querencia-benachrichtigungen                     Dienst starten
+//!   querencia-benachrichtigungen --zentrale          Mitteilungszentrale zeigen
 //!   querencia-benachrichtigungen --nicht-stoeren an|aus|status
 //!   querencia-benachrichtigungen --verlauf
 //!   querencia-benachrichtigungen --version | --hilfe
 
 mod dbus;
+mod einstellung;
 mod i18n;
 mod markup;
 mod modell;
 mod popups;
 mod symbole;
+mod verlauf;
+mod zentrale;
 
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
@@ -21,8 +25,14 @@ use std::sync::{Arc, Mutex};
 use gtk4::prelude::*;
 use gtk4::{gdk, glib};
 
+/// Programmname = Desktop-ID des Starters: daran ordnen labwc und die
+/// Fensterliste das Fenster der Zentrale dem Starter zu (xdg-toplevel app_id).
+const PROGRAMMNAME: &str = "org.querencia.Benachrichtigungen";
+
 const HILFE: &str = "Aufruf: querencia-benachrichtigungen [OPTION]
   (ohne Option)                 Benachrichtigungsdienst starten
+  --zentrale                    Mitteilungszentrale zeigen (startet den Dienst,
+                                wenn keiner läuft)
   --nicht-stoeren an|aus|status „Nicht stören“ schalten oder abfragen
   --verlauf                     die letzten 50 Meldungen ausgeben
   --version                     Version ausgeben
@@ -37,7 +47,8 @@ fn main() -> ExitCode {
         .collect::<Vec<_>>()
         .as_slice()
     {
-        [] => return dienst(),
+        [] => return dienst(false),
+        ["--zentrale"] => return zentrale(),
         ["--nicht-stoeren", wert] => dbus::client_nicht_stoeren(wert),
         ["--verlauf"] => dbus::client_verlauf(),
         ["--version"] => Ok(format!("querencia-benachrichtigungen {}", dbus::VERSION)),
@@ -56,8 +67,69 @@ fn main() -> ExitCode {
     }
 }
 
-fn dienst() -> ExitCode {
-    glib::set_prgname(Some("querencia-benachrichtigungen"));
+/// `--zentrale`: den laufenden Dienst bitten, das Fenster zu zeigen. Läuft
+/// kein Benachrichtigungsdienst, wird dieser Prozess der Dienst und zeigt die
+/// Zentrale selbst. Hält ein fremder oder älterer Dienst den Namen, erklärt
+/// ein kleines Fenster, warum es keine Zentrale gibt.
+fn zentrale() -> ExitCode {
+    let token = std::env::var("XDG_ACTIVATION_TOKEN").unwrap_or_default();
+    match dbus::client_zentrale(&token) {
+        Ok(dbus::ZentraleAufruf::Gezeigt) => ExitCode::SUCCESS,
+        Ok(dbus::ZentraleAufruf::KeinDienst) => {
+            dbus::log("kein Benachrichtigungsdienst erreichbar; starte ihn mit der Zentrale");
+            dienst(true)
+        }
+        Ok(dbus::ZentraleAufruf::Fremd(name, version)) => {
+            dbus::log(&format!(
+                "{} gehört „{name}“ {version} ohne Mitteilungszentrale",
+                dbus::NAME
+            ));
+            hinweisfenster(&name, &version);
+            ExitCode::FAILURE
+        }
+        Err(text) => {
+            eprintln!("querencia-benachrichtigungen: {text}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Kleines Fenster für `--zentrale`, wenn ein anderer Dienst läuft (z. B.
+/// noch 0.1.x bis zur nächsten Anmeldung).
+fn hinweisfenster(name: &str, version: &str) {
+    glib::set_prgname(Some(PROGRAMMNAME));
+    if gtk4::init().is_err() {
+        return;
+    }
+    let text = if name == "Querencia Benachrichtigungen" {
+        i18n::gettext(
+            "The notification center will be available after the next login. The running notification service is an older version.",
+        )
+    } else {
+        i18n::gettext_f(
+            "Another notification service is running ({name} {version}). The notification center is not available.",
+            &[("name", name), ("version", version)],
+        )
+    };
+    let schleife = glib::MainLoop::new(None, false);
+    let dialog = gtk4::AlertDialog::builder()
+        .message(i18n::gettext("Notification Center"))
+        .detail(text)
+        .buttons([i18n::gettext("_Close")])
+        .default_button(0)
+        .cancel_button(0)
+        .build();
+    let s = schleife.clone();
+    dialog.choose(
+        gtk4::Window::NONE,
+        gtk4::gio::Cancellable::NONE,
+        move |_| s.quit(),
+    );
+    schleife.run();
+}
+
+fn dienst(zentrale_zeigen: bool) -> ExitCode {
+    glib::set_prgname(Some(PROGRAMMNAME));
     // Nur Wayland (QD-062): Ohne erreichbaren Compositor fiel GTK am
     // 20.10.2026 auf X11 (Xwayland) zurück; dort gibt es kein Layer-Shell.
     // Der Dienst beendet sich dann, bevor er den Busnamen belegt.
@@ -94,13 +166,20 @@ fn dienst() -> ExitCode {
         ));
         std::process::exit(1);
     });
-    let zustandsdatei = zustandsverzeichnis()
-        .join("querencia")
-        .join("benachrichtigungen-nicht-stoeren");
-    let zustand = Arc::new(Mutex::new(modell::Zustand::neu(Some(zustandsdatei))));
-    if zustand.lock().map(|z| z.nicht_stoeren).unwrap_or(false) {
+    let state = zustandsverzeichnis().join("querencia");
+    let config = std::env::var_os("XDG_CONFIG_HOME").map(std::path::PathBuf::from);
+    let (zustand, log) = modell::Zustand::neu(modell::Orte {
+        nicht_stoeren: Some(state.join("benachrichtigungen-nicht-stoeren")),
+        verlauf: Some(state.join("benachrichtigungen.json")),
+        ini: Some(einstellung::ini_pfad(config.as_deref(), &glib::home_dir())),
+    });
+    for zeile in log {
+        dbus::log(&zeile);
+    }
+    if zustand.nicht_stoeren {
         dbus::log("Nicht stören ist an (gespeicherter Zustand)");
     }
+    let zustand = Arc::new(Mutex::new(zustand));
     let conn = match dbus::starten(zustand.clone()) {
         Ok(c) => c,
         Err(e) => {
@@ -117,6 +196,12 @@ fn dienst() -> ExitCode {
         dbus::NAME,
         dbus::VERSION
     ));
+    if zentrale_zeigen {
+        let token = std::env::var("XDG_ACTIVATION_TOKEN").unwrap_or_default();
+        glib::idle_add_local_once(move || {
+            popups::mit_dienst(|d| d.zentrale_zeigen(&token));
+        });
+    }
 
     let schleife = glib::MainLoop::new(None, false);
     let s = schleife.clone();

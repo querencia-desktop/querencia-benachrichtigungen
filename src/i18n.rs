@@ -6,9 +6,9 @@
 //! `LANGUAGE`, `LC_ALL`, `LC_MESSAGES` und `LANG` (die Sitzung setzt
 //! `LANGUAGE=de` für den Autostart).
 //!
-//! Übersetzt ist nur, was der Dienst selbst zeigt (Popups); Betreff, Text und
-//! Aktionen kommen vom Absender. Befehlszeile, `--hilfe`, Log und D-Bus-
-//! Fehlertexte bleiben deutsch.
+//! Übersetzt ist nur, was der Dienst selbst zeigt (Popups, Mitteilungszentrale,
+//! Starter); Betreff, Text und Aktionen kommen vom Absender. Befehlszeile,
+//! `--hilfe`, Log und D-Bus-Fehlertexte bleiben deutsch.
 //!
 //! Die Kataloge (`<lang>/LC_MESSAGES/querencia-benachrichtigungen.mo`) sucht
 //! der Dienst zuerst neben der Binary (`<ablage>/share/locale`, unveränderliche
@@ -22,6 +22,17 @@ use std::path::{Path, PathBuf};
 
 pub use gettextrs::gettext;
 use gettextrs::{bind_textdomain_codeset, bindtextdomain, textdomain};
+
+/// Übersetzt `msgid` und setzt `args` der Reihe nach für die Platzhalter
+/// `{name}` ein (benannte Platzhalter, damit Übersetzungen sie umstellen
+/// können; `werkzeug/i18n.py pruefen` vergleicht sie).
+pub fn gettext_f(msgid: &str, args: &[(&str, &str)]) -> String {
+    let mut text = gettext(msgid);
+    for (name, wert) in args {
+        text = text.replace(&format!("{{{name}}}"), wert);
+    }
+    text
+}
 
 /// Textdomäne = Name der .mo-Dateien.
 pub const DOMAIN: &str = "querencia-benachrichtigungen";
@@ -119,6 +130,15 @@ mod tests {
                 && !block.lines().any(|l| l.starts_with('"'));
             assert!(!empty, "unübersetzt in de.po:\n{block}");
         }
+    }
+
+    #[test]
+    fn named_placeholders_are_filled() {
+        let msgid = "{ungelesen} of {anzahl}";
+        assert_eq!(
+            gettext_f(msgid, &[("anzahl", "7"), ("ungelesen", "2")]),
+            "2 of 7"
+        );
     }
 
     #[test]

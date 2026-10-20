@@ -3,7 +3,8 @@
 dem Ubuntus AppArmor-Profil GetCapabilities verbietet).
 
   melden.py [-a schluessel=Beschriftung]... [-u low|normal|critical] [-t ms]
-            [-i symbol] [-r id] [--bild BxH] [--wait] BETREFF [TEXT]
+            [-i symbol] [-r id] [-n programm] [--desktop id] [--transient]
+            [--bild BxH] [--wait] BETREFF [TEXT]
 
 Gibt die ID aus; mit --wait wartet er auf ActionInvoked oder
 NotificationClosed für diese ID und gibt den Aktionsschlüssel bzw.
@@ -17,6 +18,7 @@ from gi.repository import Gio, GLib
 
 args = sys.argv[1:]
 actions, urgency, timeout, icon, replaces, wait, pos, bild = [], None, -1, "", 0, False, [], None
+programm, desktop, transient = "melden.py", None, False
 while args:
     a = args.pop(0)
     if a == '-a':
@@ -30,6 +32,12 @@ while args:
         icon = args.pop(0)
     elif a == '-r':
         replaces = int(args.pop(0))
+    elif a == '-n':
+        programm = args.pop(0)
+    elif a == '--desktop':
+        desktop = args.pop(0)
+    elif a == '--transient':
+        transient = True
     elif a == '--wait':
         wait = True
     elif a == '--bild':
@@ -41,6 +49,10 @@ body = pos[1] if len(pos) > 1 else ""
 hints = {}
 if urgency is not None:
     hints['urgency'] = GLib.Variant('y', urgency)
+if desktop:
+    hints['desktop-entry'] = GLib.Variant('s', desktop)
+if transient:
+    hints['transient'] = GLib.Variant('b', True)
 if bild:
     # Hint image-data (iiibiiay): RGBA-Testbild mit Farbverlauf und Rahmen.
     w, h = bild
@@ -74,7 +86,7 @@ if wait:
                          '/org/freedesktop/Notifications', None, Gio.DBusSignalFlags.NONE, on_signal)
 reply = bus.call_sync('org.freedesktop.Notifications', '/org/freedesktop/Notifications',
                       'org.freedesktop.Notifications', 'Notify',
-                      GLib.Variant('(susssasa{sv}i)', ('melden.py', replaces, icon, summary, body, actions, hints, timeout)),
+                      GLib.Variant('(susssasa{sv}i)', (programm, replaces, icon, summary, body, actions, hints, timeout)),
                       GLib.VariantType('(u)'), Gio.DBusCallFlags.NONE, -1, None)
 result['id'] = reply[0]
 if wait:
