@@ -63,6 +63,10 @@ Zubehör) ruft `--zentrale` auf.
     [Zentrale]
     verlauf=200          # Einträge im Verlauf (10 bis 1000)
 
+Kritische Meldungen (`urgency` 2) erscheinen auch bei `anzeigen=nein` und
+bei „Nicht stören“ als Popup (Freedesktop-Konvention: Akku- und
+Sicherheitswarnungen sollen nicht ungesehen im Verlauf landen).
+
 Der Dienst liest die Datei neu, sobald sie sich ändert (geprüft bei jeder
 Meldung und beim Öffnen der Zentrale). Eine Seite in den Einstellungen
 folgt später.

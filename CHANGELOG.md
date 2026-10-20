@@ -24,7 +24,10 @@ Mitteilungszentrale (Wunsch: Mitteilungen nicht nur schwebend einblenden):
   `Anzahl`, `ZentraleOffen` und Signalen `Neu`, `Geaendert`, `Zaehler`
   (`docs/dbus.md`). Die Methoden aus 0.1.x bleiben; `Verlauf` liefert wie
   bisher die letzten 50.
-- „Nicht stören“ lässt kritische Meldungen jetzt als Popup durch.
+- „Nicht stören“ lässt kritische Meldungen jetzt als Popup durch, ebenso
+  `[Einblendung] anzeigen=nein` (0.1.x unterdrückte bei „Nicht stören“
+  alle). Grund: Freedesktop-Konvention, Akku- und Sicherheitswarnungen
+  sollen nicht ungesehen im Verlauf landen.
 - ini `~/.config/querencia/benachrichtigungen.ini`: `[Einblendung]
   anzeigen, dauer_s, position (oben-rechts|oben-mitte|unten-rechts),
   hinweis`, `[Zentrale] verlauf`. Ohne Datei verhalten sich die Popups wie
