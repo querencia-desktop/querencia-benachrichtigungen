@@ -531,7 +531,7 @@ fn zeile(e: &Eintrag, jetzt: Option<&glib::DateTime>) -> gtk4::ListBoxRow {
     let knoepfe = gtk4::Box::new(gtk4::Orientation::Horizontal, 6);
     knoepfe.set_margin_top(2);
     // Aktionen nur aus dem laufenden Dienst: nach einem Neustart hört der
-    // Absender sicher nicht mehr zu.
+    // Absender nicht mehr zu (seine Verbindung ist weg).
     if e.aus_diesem_lauf {
         for (schluessel, beschriftung) in e.aktionen.iter().filter(|(k, _)| k != "default") {
             let k = gtk4::Button::with_label(beschriftung);

@@ -319,7 +319,7 @@ mod tests {
         assert!(!q.werte.anzeigen);
         // gleiche Änderungszeit: kein erneutes Lesen
         assert!(q.auffrischen().is_empty());
-        // Änderungszeit sicher anders setzen
+        // Änderungszeit 5 s in die Zukunft, damit sie sich messbar ändert
         std::fs::write(&pfad, "[Einblendung]\nanzeigen=ja\nposition=oben-mitte\n").expect("ini");
         let f = std::fs::File::options()
             .write(true)

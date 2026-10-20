@@ -8,12 +8,16 @@ angesprochen.
 ```bash
 cargo fmt --all --check
 env -u WAYLAND_DISPLAY -u DISPLAY cargo clippy --all-targets --locked -- -D warnings
-env -u WAYLAND_DISPLAY -u DISPLAY DBUS_SESSION_BUS_ADDRESS=disabled: cargo test --locked   # 37 Unit-Tests
+env -u WAYLAND_DISPLAY -u DISPLAY DBUS_SESSION_BUS_ADDRESS=disabled: cargo test --locked   # 53 Unit-Tests
 python3 werkzeug/i18n.py pruefen          # .pot aktuell, de.po vollständig
 ```
 
 Die Unit-Tests laufen ohne Katalog; `german_catalog_is_complete` prüft, dass
-jede msgid in `po/de.po` übersetzt ist.
+jede msgid in `po/de.po` übersetzt ist. Ab 0.2.0 prüfen sie auch Verlauf
+(Ringpuffer, gelesen, Ersatz, transient, JSON, Rechte 0600, defekte Datei),
+ini (alle Schlüssel, ungültige Werte, Neulesen bei Änderung),
+Anzeigedauer aus `dauer_s`, „einblenden“ (kritisch immer) und das
+Verkleinern von `image-data` ohne GTK.
 
 Die Prüfwerkzeuge `qeingabe` und `qausgabe` liegen gebaut unter
 `werkzeug/bin/`; neu bauen:
@@ -57,6 +61,33 @@ Weitere Diagnosen: `szenario-gross.sh` (übergroße Eingaben, `QB_KENNUNG`),
 Bekannt: `notify-send -A` scheitert auf Ubuntu an AppArmor
 (`/etc/apparmor.d/notify-send` erlaubt kein `GetCapabilities`), nicht am
 Dienst; Aktionen prüft `werkzeug/melden.py` (Gio).
+
+## Mitteilungszentrale (0.2.0)
+
+`szenario-zentrale.sh` (ca. 2 min, 48 Fälle Z01–Z19): Namen, Introspektion,
+Verlauf ohne `transient`, JSON (0600), Signale `Neu`/`Zaehler`/
+`PropertiesChanged`, `--zentrale`, Tasten im Fenster (Entf, Eingabe →
+`ActionInvoked(default)`, Tab + Leertaste → Aktionsknopf, Strg+F, Esc),
+`AlsGelesen`, „Nicht stören“ (Eigenschaft, Zugriffstaste, alte Methode;
+kritisch kommt durch), ini (`anzeigen`, `position` mit Pixelprüfung,
+`dauer_s`, `hinweis`, `verlauf`), „Alle entfernen“ mit Rückfrage, Neustart
+(Einträge, gelesen, IDs, keine Aktionen mehr), `--zentrale` ohne Dienst und
+bei einem älteren Dienst (`QB_ALT`, z. B. die 0.1.3-Ablage).
+
+```bash
+QB_BIN=<ordner>/querencia-benachrichtigungen QB_THEMA=1 QB_EIGENES_HOME=1 \
+    QB_ALT=~/opt/querencia/benachrichtigungen/d8287021dd7616e2/querencia-benachrichtigungen \
+    QB_LANGUAGE=de QB_GROESSE=1024x768 QB_ZEITLIMIT=300 \
+    bash werkzeug/gui-pruefung.sh szenario-zentrale.sh release
+```
+
+`QB_THEMA=1` kopiert GTK-Thema Querencia-Klassisch und Symbolthema Querencia
+(nur gelesen) ins Profil und setzt sie wie live; `QB_EIGENES_HOME=1` gibt dem
+Lauf ein eigenes HOME im Profil. Bilder `z01…z14-<sprache>-<größe>.png`;
+mit `QB_DEBUG=1` schreibt der Dienst „Zentrale: n von m Einträgen
+angezeigt“ ins Log (die Suche prüft das). `werkzeug/melden.py` kann jetzt
+auch `-n programm`, `--desktop id` und `--transient`; `bild.py popup-pixel`
+zählt Popup-Pixel in einem Rechteck.
 
 ## Ohne Wayland, ohne Layer-Shell (0.1.3, G2-AI, QD-062)
 

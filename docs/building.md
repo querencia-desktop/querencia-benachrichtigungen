@@ -25,18 +25,40 @@ msgfmt -c -o share/locale/de/LC_MESSAGES/querencia-benachrichtigungen.mo po/de.p
 python3 werkzeug/i18n.py mo <ziel>     # <ziel>/de/LC_MESSAGES/querencia-benachrichtigungen.mo
 ```
 
-Ohne Katalog ist der Tooltip englisch.
+Ohne Katalog sind Zentrale, Hinweis und Tooltip englisch.
+
+**Starter (ab 0.2.0):** `data/org.querencia.Benachrichtigungen.desktop.in`
+ist die englische Vorlage. Daraus entsteht mit den Übersetzungen
+`data/org.querencia.Benachrichtigungen.desktop`:
+
+```bash
+python3 werkzeug/i18n.py desktop data/org.querencia.Benachrichtigungen.desktop.in \
+    data/org.querencia.Benachrichtigungen.desktop
+```
+
+Ein Paket legt ihn nach `/usr/share/applications/`; `Exec` ruft
+`querencia-benachrichtigungen --zentrale`. Das Symbol
+`preferences-desktop-notification` kommt aus dem Querencia-Symbolthema.
 
 **Start in der Sitzung:** Der labwc-Autostart der Querencia-Sitzung
 (`querencia-runtime`, `session/querencia/labwc/autostart`) startet
 `~/opt/querencia/bin/querencia-benachrichtigungen`, wenn der Link ausführbar
 ist. Ist `org.freedesktop.Notifications` schon belegt, beendet sich ein
-zweiter Dienst selbst (Exit 1).
+zweiter Dienst selbst (Exit 1). Laufzeitdateien ab 0.2.0:
+`$XDG_STATE_HOME/querencia/benachrichtigungen.json` (Verlauf, 0600) und
+`$XDG_STATE_HOME/querencia/benachrichtigungen-nicht-stoeren` (wie bisher);
+Einstellungen optional in `$XDG_CONFIG_HOME/querencia/benachrichtigungen.ini`
+(siehe README).
 
 **Integration (nur auf der Entwicklungs-VM, nicht Teil der Veröffentlichung):**
 Skripte unter `integration/` stellen die unveränderliche Ablage
 `~/opt/querencia/benachrichtigungen/<sha16>/` (mit `share/locale` daneben) und
-den Link um (`pruefen|aktivieren|zurueck`). Sie starten und beenden keinen
+den Link um (`pruefen|aktivieren|zurueck`). Ab 0.2.0 legt das Skript
+außerdem den Starter `~/.local/share/applications/org.querencia.Benachrichtigungen.desktop`
+an (Exec auf die Ablage) und entfernt ihn bei `zurueck`
+(`integration/werkzeug/benachrichtigungen-020-integrieren.sh`,
+Vorlage `integration/vorschlag-020/` aus `vorlage-020-erzeugen.sh`, Probe
+`probe-020.sh <ordner>`). Sie starten und beenden keinen
 Dienst; wirksam wird ein Wechsel mit dem nächsten Sitzungsstart. Der Ordner
 enthält feste Pfade der VM und wird vor der Veröffentlichung herausgefiltert
 (ENTSCHEIDUNGEN Nr. 13).
