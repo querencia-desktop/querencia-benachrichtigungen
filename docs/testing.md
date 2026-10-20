@@ -57,3 +57,16 @@ Weitere Diagnosen: `szenario-gross.sh` (übergroße Eingaben, `QB_KENNUNG`),
 Bekannt: `notify-send -A` scheitert auf Ubuntu an AppArmor
 (`/etc/apparmor.d/notify-send` erlaubt kein `GetCapabilities`), nicht am
 Dienst; Aktionen prüft `werkzeug/melden.py` (Gio).
+
+## Ohne Wayland, ohne Layer-Shell (0.1.3, G2-AI, QD-062)
+
+```bash
+bash werkzeug/pruefung-g2ai.sh <binary> <ausgabeordner>     # N01–N04, eigener Bus, headless labwc
+```
+
+| Fall | Erwartung |
+|---|---|
+| N01 | Ohne Compositor: Exit 1, Name frei. |
+| N02 | Nur X11 (Xwayland, kein Wayland-Socket): kein Rückfall, Exit 1, Name frei. |
+| N03 | Mit Wayland: bereit, der Name gehört dem Dienst. |
+| N04 | labwc beendet: Der Dienst endet sofort, der Name ist frei. |

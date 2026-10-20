@@ -39,7 +39,8 @@ warte_ende() {
     D=$(( ($(date +%s%N) - t0) / 1000000 ))
 }
 
-# N01 kein Compositor (kein WAYLAND_DISPLAY, kein DISPLAY)
+# N01 wie eine Anmeldung, bei der labwc nicht hochkam: Der Dienst darf den
+# Namen nicht belegen, sonst blockiert er den Dienst der nächsten Sitzung.
 env -u WAYLAND_DISPLAY -u DISPLAY "$BIN" >"$OUT/n01.log" 2>&1 & p=$!
 warte_ende 10 $p
 [ "$RC" != läuft ] && [ "$RC" != 0 ] && [ -z "$(besitzer)" ] &&
