@@ -1,6 +1,6 @@
 [package]
 name = "querencia-benachrichtigungen"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 rust-version = "1.92"
 description = "Querencia Benachrichtigungen: Dienst für Desktop-Benachrichtigungen (org.freedesktop.Notifications) mit Popups über gtk4-layer-shell"

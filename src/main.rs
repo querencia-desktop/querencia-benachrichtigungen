@@ -18,7 +18,8 @@ mod symbole;
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 
-use gtk4::glib;
+use gtk4::prelude::*;
+use gtk4::{gdk, glib};
 
 const HILFE: &str = "Aufruf: querencia-benachrichtigungen [OPTION]
   (ohne Option)                 Benachrichtigungsdienst starten
@@ -57,16 +58,42 @@ fn main() -> ExitCode {
 
 fn dienst() -> ExitCode {
     glib::set_prgname(Some("querencia-benachrichtigungen"));
+    // Nur Wayland (QD-062): Ohne erreichbaren Compositor fiel GTK am
+    // 20.10.2026 auf X11 (Xwayland) zurück; dort gibt es kein Layer-Shell.
+    // Der Dienst beendet sich dann, bevor er den Busnamen belegt.
+    gdk::set_allowed_backends("wayland");
     if let Err(e) = gtk4::init() {
         dbus::log(&format!(
-            "GTK lässt sich nicht starten (Wayland-Sitzung?): {e}"
+            "kein Wayland-Compositor erreichbar ({e}); beende, ohne {} zu belegen",
+            dbus::NAME
         ));
         return ExitCode::FAILURE;
     }
+    let Some(display) = gdk::Display::default().filter(ist_wayland) else {
+        dbus::log(&format!(
+            "keine Wayland-Verbindung; beende, ohne {} zu belegen",
+            dbus::NAME
+        ));
+        return ExitCode::FAILURE;
+    };
     if !gtk4_layer_shell::is_supported() {
-        dbus::log("der Compositor bietet kein wlr-layer-shell; keine Popups möglich");
+        dbus::log(&format!(
+            "der Compositor bietet kein wlr-layer-shell; keine Popups möglich, beende, ohne {} zu belegen",
+            dbus::NAME
+        ));
         return ExitCode::FAILURE;
     }
+    // Verlorene Verbindung: sofort beenden, damit der Busname frei wird.
+    // (GDK beendet den Prozess bei einem Lesefehler meist selbst; das hier
+    // gilt für jedes Schließen des Displays.)
+    display.connect_closed(|_, fehler| {
+        dbus::log(&format!(
+            "Wayland-Verbindung {}; beende sofort und gebe {} frei",
+            if fehler { "verloren" } else { "geschlossen" },
+            dbus::NAME
+        ));
+        std::process::exit(1);
+    });
     let zustandsdatei = zustandsverzeichnis()
         .join("querencia")
         .join("benachrichtigungen-nicht-stoeren");
@@ -108,6 +135,16 @@ fn dienst() -> ExitCode {
     ExitCode::SUCCESS
 }
 
+/// Ob `display` eine Wayland-Verbindung ist (nicht X11).
+fn ist_wayland(display: &gdk::Display) -> bool {
+    ist_wayland_typ(display.type_().name())
+}
+
+/// Typname der Wayland-Displays von GDK 4.
+fn ist_wayland_typ(name: &str) -> bool {
+    name == "GdkWaylandDisplay"
+}
+
 /// `$XDG_STATE_HOME`, sonst `~/.local/state` (wie der Sitzungsstarter).
 fn zustandsverzeichnis() -> std::path::PathBuf {
     match std::env::var_os("XDG_STATE_HOME") {
@@ -124,4 +161,17 @@ fn libc_sigterm() -> i32 {
 }
 fn libc_sigint() -> i32 {
     2
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nur_wayland_displays_zaehlen() {
+        assert!(ist_wayland_typ("GdkWaylandDisplay"));
+        assert!(!ist_wayland_typ("GdkX11Display"));
+        assert!(!ist_wayland_typ("GdkBroadwayDisplay"));
+        assert!(!ist_wayland_typ(""));
+    }
 }

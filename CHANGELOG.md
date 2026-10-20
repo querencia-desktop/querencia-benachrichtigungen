@@ -1,5 +1,20 @@
 # Änderungen
 
+## 0.1.3 – 2026-10-20
+
+Kein Dienst ohne Wayland (QD-062, G2-AI):
+
+- Nur das Wayland-Backend von GDK ist zugelassen. Ohne erreichbaren
+  Compositor beendet sich der Dienst sofort, ohne
+  `org.freedesktop.Notifications` zu belegen. Ein Rückfall auf X11
+  (Xwayland) mit der CRITICAL-Meldung von gtk4-layer-shell kommt nicht
+  mehr vor.
+- Ist das Display keine Wayland-Verbindung oder fehlt wlr-layer-shell,
+  beendet sich der Dienst ebenfalls vor dem Belegen des Namens.
+- Wird die Wayland-Verbindung geschlossen, endet der Dienst sofort und
+  gibt den Namen frei. Das gilt auch dann, wenn GDK den Prozess nicht
+  selbst beendet.
+
 ## 0.1.2 – 2026-10-20
 
 Englisch und Deutsch über GNU gettext (G2-AH, Muster Querencia Editor 0.2.0):
