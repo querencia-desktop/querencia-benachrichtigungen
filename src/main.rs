@@ -101,6 +101,7 @@ fn hinweisfenster(name: &str, version: &str) {
     if gtk4::init().is_err() {
         return;
     }
+    farbschema_anstossen();
     let text = if name == "Querencia Benachrichtigungen" {
         i18n::gettext(
             "The notification center will be available after the next login. The running notification service is an older version.",
@@ -141,6 +142,7 @@ fn dienst(zentrale_zeigen: bool) -> ExitCode {
         ));
         return ExitCode::FAILURE;
     }
+    farbschema_anstossen();
     let Some(display) = gdk::Display::default().filter(ist_wayland) else {
         dbus::log(&format!(
             "keine Wayland-Verbindung; beende, ohne {} zu belegen",
@@ -218,6 +220,16 @@ fn dienst(zentrale_zeigen: bool) -> ExitCode {
     });
     schleife.run();
     ExitCode::SUCCESS
+}
+
+/// QD-081: GTK 4.22 wendet ein beim Start schon dunkles Farbschema
+/// („prefer-dark“) erst nach einem Wechsel im laufenden Programm an; ein
+/// neu gestarteter Dienst bliebe hell. Die Meldung überträgt den Wert einmal
+/// neu an das Thema (hell bleibt unverändert).
+fn farbschema_anstossen() {
+    if let Some(s) = gtk4::Settings::default() {
+        s.notify("gtk-interface-color-scheme");
+    }
 }
 
 /// Ob `display` eine Wayland-Verbindung ist (nicht X11).

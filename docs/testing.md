@@ -8,7 +8,7 @@ angesprochen.
 ```bash
 cargo fmt --all --check
 env -u WAYLAND_DISPLAY -u DISPLAY cargo clippy --all-targets --locked -- -D warnings
-env -u WAYLAND_DISPLAY -u DISPLAY DBUS_SESSION_BUS_ADDRESS=disabled: cargo test --locked   # 53 Unit-Tests
+env -u WAYLAND_DISPLAY -u DISPLAY DBUS_SESSION_BUS_ADDRESS=disabled: cargo test --locked   # 54 Unit-Tests
 python3 werkzeug/i18n.py pruefen          # .pot aktuell, de.po vollständig
 ```
 
@@ -51,6 +51,18 @@ QB_BIN=<ordner>/querencia-benachrichtigungen QB_LANGUAGE=de QB_GROESSE=1024x768 
 QB_BIN=<ordner>/querencia-benachrichtigungen QB_LANGUAGE=en QB_GROESSE=1920x1080 \
     bash werkzeug/gui-pruefung.sh szenario-sprache.sh release
 ```
+
+**Dunkle Darstellung (ab 0.2.1):** Die Popup-CSS hat einen Block
+`@media (prefers-color-scheme: dark)`; der Unit-Test
+`dunkelblock_deckt_jede_helle_farbe_ab` prüft, dass jede Regel mit fester
+Farbe dort eine dunkle Fassung hat. Sichtbar prüfen lässt sich das nur mit
+einem Settings-Portal im Wegwerf-Bus (der Harness hier schaltet Portale ab):
+ein Ersatz, der `org.freedesktop.appearance color-scheme` (0/1) und
+`org.gnome.desktop.interface` liefert und `SettingChanged` sendet, dazu ein
+Verlauf mit festen Zeiten für pixelgleiche Bilder. Ohne
+`org.gnome.desktop.interface` im Portal nimmt GTK 4.22 sein eingebautes
+Thema statt `settings.ini`. Die Werkzeuge der Prüfung von 0.2.1 liegen bei
+der Integration auf der Entwicklungs-VM (nicht im Repo).
 
 Weitere Diagnosen: `szenario-gross.sh` (übergroße Eingaben, `QB_KENNUNG`),
 `szenario-caps.sh`, `szenario-icons.sh`, `szenario-aktion.sh`. Ergebnis in

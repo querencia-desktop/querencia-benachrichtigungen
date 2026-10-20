@@ -1,5 +1,23 @@
 # Änderungen
 
+## 0.2.1 – 2026-10-21
+
+Dunkle Darstellung (CSS-Welle dunkel, QD-081, mit Querencia-Klassisch 0.2):
+
+- Popups haben eine dunkle Fassung für „Dunkle Darstellung bevorzugen“
+  (`color-scheme prefer-dark`): Grund `#34332f`, Rand `#23221f`, Schrift
+  `#f2f1f0`/`#dfdbd2`, Programmname und Hinweis `#b3aea7` (Kontrast AA).
+  Der kritische Rand bleibt orange. Der eigene CSS-Anbieter ist dafür an
+  `gtk-interface-color-scheme` gebunden; ohne Bindung blieb der Dunkelblock
+  in jeder Lage wirkungslos (isoliert gemessen).
+- Das Farbschema gilt auch nach dem Start: GTK 4.22 wendet ein beim Start
+  schon dunkles Schema erst nach einem Wechsel an; der Dienst meldet
+  `gtk-interface-color-scheme` einmal nach `gtk4::init()` (auch im
+  Hinweisfenster von `--zentrale`).
+- Die Mitteilungszentrale hat keine eigenen Farben außer dem orangen Rand
+  kritischer Einträge und folgt dem Thema.
+- Hell unverändert (pixelgleich mit 0.2.0); Texte und Katalog unverändert.
+
 ## 0.2.0 – 2026-10-20
 
 Mitteilungszentrale (Wunsch: Mitteilungen nicht nur schwebend einblenden):

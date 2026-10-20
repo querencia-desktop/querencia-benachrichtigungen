@@ -54,6 +54,13 @@ button.qb-hinweis {
   color: #7a756f; font-size: 0.85em;
 }
 button.qb-hinweis:hover { text-decoration: underline; color: #3c3c3c; }
+@media (prefers-color-scheme: dark) {
+  box.qb-meldung { background-color: #34332f; border-color: #23221f; color: #f2f1f0; }
+  label.qb-text { color: #dfdbd2; }
+  label.qb-app, button.qb-hinweis { color: #b3aea7; }
+  button.qb-schliessen:hover { background-color: #4a4843; }
+  button.qb-hinweis:hover { color: #dfdbd2; }
+}
 "#;
 
 thread_local! {
@@ -107,6 +114,15 @@ impl Dienst {
         let display = gdk::Display::default().ok_or("kein Display")?;
         symbole::klassisches_thema_verwenden();
         let css = gtk4::CssProvider::new();
+        // Der Dunkelblock in CSS greift nur, wenn dieser eigene Anbieter dem
+        // Farbschema folgt; GTK bindet von sich aus nur den Themenanbieter.
+        // Gemessen in 0.2.1: ohne Bindung blieben die Popups beim Start und
+        // nach jedem Wechsel hell.
+        if let Some(s) = gtk4::Settings::default() {
+            s.bind_property("gtk-interface-color-scheme", &css, "prefers-color-scheme")
+                .sync_create()
+                .build();
+        }
         css.load_from_string(CSS);
         gtk4::style_context_add_provider_for_display(
             &display,
@@ -762,4 +778,44 @@ fn baue_kasten(m: &Meldung, hinweis: bool) -> gtk4::Box {
     });
     kasten.add_controller(klick);
     kasten
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CSS;
+
+    /// Regeln „Selektor { Inhalt }“ eines CSS-Teils ohne Verschachtelung.
+    fn regeln(teil: &str) -> Vec<(String, String)> {
+        teil.split('}')
+            .filter_map(|r| r.split_once('{'))
+            .map(|(sel, inhalt)| (sel.trim().to_string(), inhalt.to_string()))
+            .collect()
+    }
+
+    fn hat_feste_farbe(inhalt: &str) -> bool {
+        // Orange (#f07746) ist Akzent und gilt hell wie dunkel.
+        inhalt
+            .match_indices('#')
+            .any(|(i, _)| !inhalt[i..].starts_with("#f07746"))
+    }
+
+    #[test]
+    fn dunkelblock_deckt_jede_helle_farbe_ab() {
+        let (hell, dunkel) = CSS
+            .split_once("@media (prefers-color-scheme: dark) {")
+            .expect("Dunkelblock fehlt");
+        let dunkle_selektoren: Vec<String> = regeln(dunkel)
+            .iter()
+            .flat_map(|(sel, _)| sel.split(',').map(|s| s.trim().to_string()))
+            .collect();
+        for (sel, inhalt) in regeln(hell) {
+            if hat_feste_farbe(&inhalt) {
+                assert!(
+                    dunkle_selektoren.contains(&sel),
+                    "„{sel}“ hat eine feste Farbe, aber keine dunkle Fassung"
+                );
+            }
+        }
+        assert!(!hat_feste_farbe("border: 2px solid #f07746;"));
+    }
 }

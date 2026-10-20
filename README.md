@@ -24,6 +24,11 @@ gtk4-layer-shell, zbus.
   Standardaktion aus, Strg+F sucht.
 - „Nicht stören“ unterdrückt Popups außer kritischen; der Verlauf füllt
   sich weiter.
+- **Dunkle Darstellung (ab 0.2.1):** Unter „Dunkle Darstellung bevorzugen“
+  (`color-scheme prefer-dark`) sind Popups und Zentrale dunkel, beim Start
+  und bei einem Wechsel im Lauf. Die Zentrale folgt dem GTK-Thema
+  (Querencia-Klassisch ab 0.2), die Popups haben eigene helle und dunkle
+  Farben.
 - Hints: `urgency`, `image-path`, `image-data`, `desktop-entry`,
   `transient`, `resident`, `category`. Body-Markup (`b`, `i`, `u`, `a`)
   wird sicher gerendert, alles andere als Text gezeigt.
