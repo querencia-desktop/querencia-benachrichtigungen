@@ -1,3 +1,7 @@
 /target
 /laufzeit
 /gui-test
+__pycache__/
+# Vorlage der Integration 0.1.2: Binary und Katalog nicht ins Repo
+/integration/vorschlag-012/querencia-benachrichtigungen
+/integration/vorschlag-012/share/

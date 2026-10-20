@@ -9,6 +9,7 @@
 //!   querencia-benachrichtigungen --version | --hilfe
 
 mod dbus;
+mod i18n;
 mod markup;
 mod modell;
 mod popups;
@@ -27,6 +28,7 @@ const HILFE: &str = "Aufruf: querencia-benachrichtigungen [OPTION]
   --hilfe, -h                   diese Hilfe";
 
 fn main() -> ExitCode {
+    i18n::init();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let ergebnis = match args
         .iter()

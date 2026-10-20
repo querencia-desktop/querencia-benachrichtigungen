@@ -1,6 +1,6 @@
 [package]
 name = "querencia-benachrichtigungen"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.92"
 description = "Querencia Benachrichtigungen: Dienst für Desktop-Benachrichtigungen (org.freedesktop.Notifications) mit Popups über gtk4-layer-shell"
@@ -25,6 +25,9 @@ glib-unix = "0.22"
 # D-Bus wie Querencia Files: zbus 5 mit async-io, ohne tokio.
 zbus = { version = "5.19", default-features = false, features = ["async-io"] }
 serde = "1"
+# Übersetzungen über GNU gettext der Systembibliothek (glibc), wie die
+# übrigen Querencia-Programme.
+gettext-rs = { version = "0.8", features = ["gettext-system"] }
 
 [profile.release]
 lto = true

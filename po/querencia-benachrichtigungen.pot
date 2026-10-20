@@ -1,0 +1,23 @@
+# Übersetzungsvorlage für Querencia Benachrichtigungen.
+# Copyright (C) 2026 Querencia Desktop contributors
+# Diese Datei steht unter derselben Lizenz wie Querencia Benachrichtigungen (GPL-3.0-or-later).
+# Erzeugt mit werkzeug/i18n.py pot – nicht von Hand bearbeiten.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: querencia-benachrichtigungen\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#. TRANSLATORS: Tooltip des Schließen-Knopfs oben rechts in jedem Popup.
+#: src/popups.rs:374
+msgid "Close"
+msgstr ""

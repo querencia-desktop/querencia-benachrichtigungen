@@ -15,6 +15,7 @@ use zbus::Connection;
 use zbus::object_server::SignalEmitter;
 
 use crate::dbus::{self, Notifications, Querencia, grund};
+use crate::i18n;
 use crate::modell::{Dringlichkeit, Meldung, Zustand};
 use crate::{markup, symbole};
 
@@ -369,7 +370,8 @@ fn baue_kasten(m: &Meldung) -> gtk4::Box {
     let schliessen = gtk4::Button::from_icon_name("window-close-symbolic");
     schliessen.add_css_class("qb-schliessen");
     schliessen.set_valign(gtk4::Align::Start);
-    schliessen.set_tooltip_text(Some("Schließen"));
+    // TRANSLATORS: Tooltip des Schließen-Knopfs oben rechts in jedem Popup.
+    schliessen.set_tooltip_text(Some(&i18n::gettext("Close")));
     schliessen.set_can_focus(false);
     schliessen.connect_clicked(move |_| spaeter(move |d| d.schliesse(id, grund::GESCHLOSSEN)));
     kopf.append(&schliessen);

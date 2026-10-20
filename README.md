@@ -28,11 +28,32 @@ Dienst für Desktop-Benachrichtigungen nach der Freedesktop-Spezifikation
 Ist `org.freedesktop.Notifications` schon belegt, meldet der Dienst den
 Besitzer und beendet sich mit Exit 1.
 
-## Bauen und prüfen
+Gestartet wird der Dienst vom labwc-Autostart der Querencia-Sitzung
+(`querencia-runtime`, `session/querencia/labwc/autostart`) über den Link
+`~/opt/querencia/bin/querencia-benachrichtigungen`.
 
-    cargo build --release -j2
-    cargo test
-    bash werkzeug/gui-pruefung.sh              # isoliert, eigener labwc + D-Bus
+Bauen: [docs/building.md](docs/building.md). Prüfen (Unit-Tests, isolierte
+GUI mit eigenem labwc und eigenem D-Bus): [docs/testing.md](docs/testing.md).
 
-Siehe `integration/` für den vorbereiteten Autostart-Patch und das
-Integrationsskript (nur nach Freigabe des Besitzers ausführen).
+## Sprachen
+
+Seit 0.1.2 sind die Texte, die der Dienst selbst zeigt, englisch im Code
+(msgid) und deutsch in `po/de.po` (GNU gettext, Muster Querencia Editor
+0.2.0); der deutsche Wortlaut ist der bisherige. Das ist nur der Tooltip
+„Close“/„Schließen“ am Schließen-Knopf der Popups – Betreff, Text und
+Aktionen kommen vom Absender. Die Sprache folgt `LANGUAGE`/`LANG` (die
+Sitzung setzt `LANGUAGE=de`); ohne deutschen Katalog erscheint Englisch.
+Befehlszeile, `--hilfe`, Log, D-Bus-Fehlertexte und `GetServerInformation`
+(„Querencia Benachrichtigungen“) bleiben unverändert.
+
+## Lizenz
+
+GNU GPL, Version 3 oder neuer, siehe [LICENSE](LICENSE). Copyright 2026
+Querencia Desktop contributors. Eigener Code; aus notification-daemon wurde
+kein Code übernommen. Änderungen: [CHANGELOG.md](CHANGELOG.md).
+
+Eigene Vermerke: `werkzeug/virtual-keyboard-unstable-v1.xml` (gekürzte Kopie
+des Wayland-Protokolls, Copyright Kristian Høgsberg u. a., MIT-artige Lizenz
+im Dateikopf) und die mit `wayland-scanner` erzeugten Dateien unter
+`werkzeug/bin/` (Lizenz der jeweiligen Protokolle); nur für das Prüfwerkzeug.
+
