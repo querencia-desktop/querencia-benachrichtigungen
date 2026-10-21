@@ -60,5 +60,4 @@ an (Exec auf die Ablage) und entfernt ihn bei `zurueck`
 Vorlage `integration/vorschlag-020/` aus `vorlage-020-erzeugen.sh`, Probe
 `probe-020.sh <ordner>`). Sie starten und beenden keinen
 Dienst; wirksam wird ein Wechsel mit dem nächsten Sitzungsstart. Der Ordner
-enthält feste Pfade der VM und wird vor der Veröffentlichung herausgefiltert
-(ENTSCHEIDUNGEN Nr. 13).
+enthält feste Pfade der VM und wird vor der Veröffentlichung herausgefiltert.

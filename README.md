@@ -3,8 +3,10 @@
 Dienst für Desktop-Benachrichtigungen für alle, die Querencia Desktop
 benutzen: zeigt Meldungen anderer Programme als Popups unter dem oberen Panel
 und sammelt sie in der Mitteilungszentrale. Teil von
-[Querencia Desktop](https://github.com/querencia-desktop/querencia) – einer
+[Querencia Desktop](https://querencialinux.org) – einer
 klassischen Desktopumgebung im GNOME-2-Stil für Wayland (labwc, Rust, GTK 4).
+Installiert wird es zusammen mit Querencia Desktop aus der APT-Quelle;
+Anleitung auf <https://querencialinux.org>.
 
 *English summary:* A desktop notification daemon (org.freedesktop.Notifications
 1.2) with layer-shell popups, do-not-disturb and a notification centre with
