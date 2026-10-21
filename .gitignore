@@ -14,3 +14,6 @@ __pycache__/
 # Vorlage der Integration 0.2.1: Binary und Katalog nicht ins Repo
 /integration/021/vorschlag-021/querencia-benachrichtigungen
 /integration/021/vorschlag-021/share/
+# Vorlage der Integration 0.2.2: Binary und Katalog nicht ins Repo
+/integration/022/vorschlag-022/querencia-benachrichtigungen
+/integration/022/vorschlag-022/share/
