@@ -1,5 +1,19 @@
 # Änderungen
 
+## 0.2.2 – 2026-10-21
+
+Kontrast hell (QD-089, Kontrast-Sammelauftrag):
+
+- Programmname und Hinweis „in der Zentrale“ im Popup hell `#6f6a64`
+  statt `#7a756f` auf `#f9f8f6`: 5,0:1 statt 4,3:1 (WCAG AA 4,5:1).
+  Gleicher Farbton, nur dunkler; Überfahren bleibt `#3c3c3c`.
+- Dunkel unverändert (`#b3aea7` auf `#34332f`, 5,7:1). Die
+  Mitteilungszentrale hat keine eigene Nebenschrift-Farbe (Zeit und Anzahl
+  mit 75 % der Themenschrift; im Bild gemessen hell 10,4:1 in der Liste und
+  5,1:1 auf der Auswahl) und bleibt unverändert.
+- Neuer Unit-Test `programmname_und_hinweis_erreichen_aa` (hell und dunkel).
+- Sonst pixelgleich mit 0.2.1; Texte und Katalog unverändert.
+
 ## 0.2.1 – 2026-10-21
 
 Dunkle Darstellung (CSS-Welle dunkel, QD-081, mit Querencia-Klassisch 0.2):

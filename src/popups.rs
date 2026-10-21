@@ -41,7 +41,7 @@ box.qb-meldung {
 box.qb-meldung.qb-kritisch { border: 2px solid #f07746; padding: 7px 7px 7px 9px; }
 label.qb-betreff { font-weight: bold; }
 label.qb-text { color: #3c3c3c; }
-label.qb-app { color: #7a756f; font-size: 0.85em; }
+label.qb-app { color: #6f6a64; font-size: 0.85em; }
 button.qb-schliessen {
   padding: 0; min-width: 18px; min-height: 18px;
   background: none; border: none; box-shadow: none; -gtk-icon-size: 12px;
@@ -51,7 +51,7 @@ button.qb-aktion { padding: 1px 10px; min-height: 22px; border-radius: 2px; }
 button.qb-hinweis {
   padding: 0 2px; min-height: 0; min-width: 0;
   background: none; border: none; box-shadow: none;
-  color: #7a756f; font-size: 0.85em;
+  color: #6f6a64; font-size: 0.85em;
 }
 button.qb-hinweis:hover { text-decoration: underline; color: #3c3c3c; }
 @media (prefers-color-scheme: dark) {
@@ -817,5 +817,55 @@ mod tests {
             }
         }
         assert!(!hat_feste_farbe("border: 2px solid #f07746;"));
+    }
+
+    /// Erste Farbe `#rrggbb` nach `eigenschaft:` in der Regel `selektor`.
+    fn farbe(teil: &str, selektor: &str, eigenschaft: &str) -> [u8; 3] {
+        let (_, inhalt) = regeln(teil)
+            .into_iter()
+            .find(|(sel, _)| sel.split(',').any(|s| s.trim() == selektor))
+            .unwrap_or_else(|| panic!("Regel „{selektor}“ fehlt"));
+        let wert = inhalt
+            .split(';')
+            .find_map(|d| d.trim().strip_prefix(eigenschaft)?.strip_prefix(':'))
+            .unwrap_or_else(|| panic!("„{selektor}“ ohne {eigenschaft}"));
+        let hex = &wert[wert.find('#').expect("keine Farbe") + 1..][..6];
+        let k = |i: usize| u8::from_str_radix(&hex[i..i + 2], 16).unwrap();
+        [k(0), k(2), k(4)]
+    }
+
+    /// Kontrastverhältnis nach WCAG 2.x (wie kontrast.py des Thema-Repos).
+    fn kontrast(a: [u8; 3], b: [u8; 3]) -> f64 {
+        let l = |c: [u8; 3]| {
+            let k = |v: u8| {
+                let v = f64::from(v) / 255.0;
+                if v <= 0.03928 {
+                    v / 12.92
+                } else {
+                    ((v + 0.055) / 1.055).powf(2.4)
+                }
+            };
+            0.2126 * k(c[0]) + 0.7152 * k(c[1]) + 0.0722 * k(c[2])
+        };
+        let (h, d) = (l(a).max(l(b)), l(a).min(l(b)));
+        (h + 0.05) / (d + 0.05)
+    }
+
+    #[test]
+    fn programmname_und_hinweis_erreichen_aa() {
+        // 0.2.2 (QD-089): hell bis 0.2.1 #7a756f = 4,3:1, jetzt #6f6a64.
+        let (hell, dunkel) = CSS
+            .split_once("@media (prefers-color-scheme: dark) {")
+            .expect("Dunkelblock fehlt");
+        for (teil, grund) in [
+            (hell, farbe(hell, "box.qb-meldung", "background-color")),
+            (dunkel, farbe(dunkel, "box.qb-meldung", "background-color")),
+        ] {
+            for sel in ["label.qb-app", "button.qb-hinweis"] {
+                let k = kontrast(farbe(teil, sel, "color"), grund);
+                assert!(k >= 4.5, "„{sel}“ nur {k:.2}:1");
+            }
+        }
+        assert!(kontrast([0x7a, 0x75, 0x6f], [0xf9, 0xf8, 0xf6]) < 4.5);
     }
 }

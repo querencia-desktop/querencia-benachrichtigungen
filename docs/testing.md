@@ -55,7 +55,9 @@ QB_BIN=<ordner>/querencia-benachrichtigungen QB_LANGUAGE=en QB_GROESSE=1920x1080
 **Dunkle Darstellung (ab 0.2.1):** Die Popup-CSS hat einen Block
 `@media (prefers-color-scheme: dark)`; der Unit-Test
 `dunkelblock_deckt_jede_helle_farbe_ab` prüft, dass jede Regel mit fester
-Farbe dort eine dunkle Fassung hat. Sichtbar prüfen lässt sich das nur mit
+Farbe dort eine dunkle Fassung hat;
+`programmname_und_hinweis_erreichen_aa` (ab 0.2.2) rechnet den Kontrast von
+Programmname und Hinweis hell und dunkel nach (WCAG AA 4,5:1). Sichtbar prüfen lässt sich das nur mit
 einem Settings-Portal im Wegwerf-Bus (der Harness hier schaltet Portale ab):
 ein Ersatz, der `org.freedesktop.appearance color-scheme` (0/1) und
 `org.gnome.desktop.interface` liefert und `SettingChanged` sendet, dazu ein
