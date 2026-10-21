@@ -92,9 +92,8 @@ Englisch und Deutsch über GNU gettext (G2-AH, Muster Querencia Editor 0.2.0):
 - `werkzeug/i18n.py` für die po-Pflege; GUI-Prüfung mit `QB_LANGUAGE`,
   `QB_GROESSE` und neuem Szenario `szenario-sprache.sh`; Quelltexte von
   `qeingabe`/`qausgabe` liegen jetzt im Repo (bauen byte-gleich nach).
-- Doku nach ENTSCHEIDUNGEN Nr. 17 (`docs/building.md`, `docs/testing.md`,
-  Arbeitsregeln), `LICENSE` mit Lizenzkopf
-  (Nr. 14 Q5), dieses Änderungsprotokoll.
+- Doku unter `docs/` (`docs/building.md`, `docs/testing.md`), Lizenzkopf,
+  dieses Änderungsprotokoll.
 
 ## 0.1.1 – 2026-10-18
 

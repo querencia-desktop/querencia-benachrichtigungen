@@ -24,3 +24,14 @@
 # S005 englische Kommentare in isoliert.py, eingabe.sh, qeingabe.c und den
 #      mit wayland-scanner erzeugten Dateien unter werkzeug/bin/: Kopien aus
 #      querencia-runtime bzw. Upstream, Sprache der Herkunft beibehalten.
+#
+# Veröffentlichungsklon (ENTSCHEIDUNGEN Nr. 17, Vorlagen-Commit): GitHub erwartet
+# diese Dateien im Root bzw. unter .github/ – die einzigen Pfadeinträge, begründete
+# Ausnahmen von „keine Pfadeinträge“ (reine Vorlagen bzw. Protokolldaten).
+MARKE.md
+CONTRIBUTING.md
+SECURITY.md
+CHANGELOG.md
+.github/pull_request_template.md
+.github/ISSUE_TEMPLATE/*.md
+werkzeug/virtual-keyboard-unstable-v1.xml
