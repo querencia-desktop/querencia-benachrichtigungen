@@ -2,7 +2,7 @@
 
 ## 0.2.2 – 2026-10-21
 
-Kontrast hell (QD-089, Kontrast-Sammelauftrag):
+Kontrast hell:
 
 - Programmname und Hinweis „in der Zentrale“ im Popup hell `#6f6a64`
   statt `#7a756f` auf `#f9f8f6`: 5,0:1 statt 4,3:1 (WCAG AA 4,5:1).
@@ -16,7 +16,7 @@ Kontrast hell (QD-089, Kontrast-Sammelauftrag):
 
 ## 0.2.1 – 2026-10-21
 
-Dunkle Darstellung (CSS-Welle dunkel, QD-081, mit Querencia-Klassisch 0.2):
+Dunkle Darstellung (CSS-Welle dunkel, mit Querencia-Klassisch 0.2):
 
 - Popups haben eine dunkle Fassung für „Dunkle Darstellung bevorzugen“
   (`color-scheme prefer-dark`): Grund `#34332f`, Rand `#23221f`, Schrift
@@ -68,7 +68,7 @@ Mitteilungszentrale (Wunsch: Mitteilungen nicht nur schwebend einblenden):
 
 ## 0.1.3 – 2026-10-20
 
-Kein Dienst ohne Wayland (QD-062, G2-AI):
+Kein Dienst ohne Wayland:
 
 - Nur das Wayland-Backend von GDK ist zugelassen. Ohne erreichbaren
   Compositor beendet sich der Dienst sofort, ohne
@@ -83,7 +83,7 @@ Kein Dienst ohne Wayland (QD-062, G2-AI):
 
 ## 0.1.2 – 2026-10-20
 
-Englisch und Deutsch über GNU gettext (G2-AH, Muster Querencia Editor 0.2.0):
+Englisch und Deutsch über GNU gettext (Muster Querencia Editor 0.2.0):
 
 - Der einzige eigene sichtbare Text, der Tooltip am Schließen-Knopf der
   Popups, ist englisch im Code („Close“), Deutsch aus `po/de.po` mit dem
@@ -92,20 +92,19 @@ Englisch und Deutsch über GNU gettext (G2-AH, Muster Querencia Editor 0.2.0):
 - `werkzeug/i18n.py` für die po-Pflege; GUI-Prüfung mit `QB_LANGUAGE`,
   `QB_GROESSE` und neuem Szenario `szenario-sprache.sh`; Quelltexte von
   `qeingabe`/`qausgabe` liegen jetzt im Repo (bauen byte-gleich nach).
-- Doku nach ENTSCHEIDUNGEN Nr. 17 (`docs/building.md`, `docs/testing.md`,
-  Arbeitsregeln), `LICENSE` mit Lizenzkopf
-  (Nr. 14 Q5), dieses Änderungsprotokoll.
+- Doku unter `docs/` (`docs/building.md`, `docs/testing.md`), Lizenzkopf,
+  dieses Änderungsprotokoll.
 
 ## 0.1.1 – 2026-10-18
 
 Bilder aus `image-data`, `image-path` und `app_icon` werden auf 48 px
 verkleinert (Electron/libnotify schickt 512×512), Betreff höchstens 2,
 Text höchstens 5 Zeilen (3 mit Aktionsknöpfen), Breite bleibt 360 px.
-Prüffälle für übergroße Eingaben (G2-L).
+Prüffälle für übergroße Eingaben.
 
 ## 0.1.0 – 2026-10-18
 
-Erster Stand (G2-L): Dienst `org.freedesktop.Notifications` 1.2 mit Popups
+Erster Stand: Dienst `org.freedesktop.Notifications` 1.2 mit Popups
 oben rechts (gtk4-layer-shell), Dringlichkeiten, Aktionen, Body-Markup,
 Hints, „Nicht stören“ mit Verlauf über `org.querencia.Benachrichtigungen`,
 Befehlszeile `--nicht-stoeren`, `--verlauf`. Isoliert geprüft (42 Fälle).
