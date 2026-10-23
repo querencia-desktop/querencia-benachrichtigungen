@@ -64,7 +64,7 @@ ein Ersatz, der `org.freedesktop.appearance color-scheme` (0/1) und
 Verlauf mit festen Zeiten für pixelgleiche Bilder. Ohne
 `org.gnome.desktop.interface` im Portal nimmt GTK 4.22 sein eingebautes
 Thema statt `settings.ini`. Die Werkzeuge der Prüfung von 0.2.1 liegen bei
-der Integration auf der Entwicklungs-VM (nicht im Repo).
+der Integration in der Entwicklungsumgebung (nicht im Repo).
 
 Weitere Diagnosen: `szenario-gross.sh` (übergroße Eingaben, `QB_KENNUNG`),
 `szenario-caps.sh`, `szenario-icons.sh`, `szenario-aktion.sh`. Ergebnis in
@@ -103,7 +103,7 @@ angezeigt“ ins Log (die Suche prüft das). `werkzeug/melden.py` kann jetzt
 auch `-n programm`, `--desktop id` und `--transient`; `bild.py popup-pixel`
 zählt Popup-Pixel in einem Rechteck.
 
-## Ohne Wayland, ohne Layer-Shell (0.1.3, G2-AI, QD-062)
+## Ohne Wayland, ohne Layer-Shell (0.1.3)
 
 ```bash
 bash werkzeug/pruefung-g2ai.sh <binary> <ausgabeordner>     # N01–N04, eigener Bus, headless labwc

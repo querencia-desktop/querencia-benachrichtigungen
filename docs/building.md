@@ -50,7 +50,7 @@ zweiter Dienst selbst (Exit 1). Laufzeitdateien ab 0.2.0:
 Einstellungen optional in `$XDG_CONFIG_HOME/querencia/benachrichtigungen.ini`
 (siehe README).
 
-**Integration (nur auf der Entwicklungs-VM, nicht Teil der Veröffentlichung):**
+**Integration (nur in der Entwicklungsumgebung, nicht Teil der Veröffentlichung):**
 Skripte unter `integration/` stellen die unveränderliche Ablage
 `~/opt/querencia/benachrichtigungen/<sha16>/` (mit `share/locale` daneben) und
 den Link um (`pruefen|aktivieren|zurueck`). Ab 0.2.0 legt das Skript
