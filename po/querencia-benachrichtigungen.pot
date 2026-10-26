@@ -19,7 +19,7 @@ msgstr ""
 
 #. TRANSLATORS: Desktop-Datei, Schlüssel Name
 #. TRANSLATORS: Titel des Fensters und Name im Menü (Zubehör).
-#: data/org.querencia.Benachrichtigungen.desktop.in:12 src/main.rs:116 src/zentrale.rs:96
+#: data/org.querencia.Benachrichtigungen.desktop.in:12 src/main.rs:117 src/zentrale.rs:102
 msgid "Notification Center"
 msgstr ""
 
@@ -33,137 +33,137 @@ msgstr ""
 msgid "Notifications;Messages;History;Do Not Disturb;"
 msgstr ""
 
-#: src/main.rs:105
+#: src/main.rs:106
 msgid ""
 "The notification center will be available after the next login. The running notification service is an older version."
 msgstr ""
 
-#: src/main.rs:109
+#: src/main.rs:110
 #, no-c-format
 msgid ""
 "Another notification service is running ({name} {version}). The notification center is not available."
 msgstr ""
 
-#: src/main.rs:118 src/zentrale.rs:152
+#: src/main.rs:119 src/zentrale.rs:157
 msgid "_Close"
 msgstr ""
 
 #. TRANSLATORS: Tooltip des Schließen-Knopfs oben rechts in jedem Popup.
-#: src/popups.rs:640
+#: src/popups.rs:662
 msgid "Close"
 msgstr ""
 
 #. TRANSLATORS: kleiner Hinweis unten rechts im Popup; ein Klick öffnet die Mitteilungszentrale, in der die Meldung gespeichert ist.
-#: src/popups.rs:688
+#: src/popups.rs:710
 msgid "in the notification center"
 msgstr ""
 
-#: src/popups.rs:690
+#: src/popups.rs:712
 msgid "Open the notification center"
 msgstr ""
 
-#: src/zentrale.rs:144
+#: src/zentrale.rs:149
 msgid "Mark All as _Read"
 msgstr ""
 
-#: src/zentrale.rs:148
+#: src/zentrale.rs:153
 msgid "_Clear All…"
 msgstr ""
 
-#: src/zentrale.rs:157
+#: src/zentrale.rs:162
 msgid "_Notifications"
 msgstr ""
 
-#: src/zentrale.rs:159
+#: src/zentrale.rs:164
 msgid "_Find"
 msgstr ""
 
-#: src/zentrale.rs:162 src/zentrale.rs:193
+#: src/zentrale.rs:167 src/zentrale.rs:198
 msgid "Do Not _Disturb"
 msgstr ""
 
-#: src/zentrale.rs:166
+#: src/zentrale.rs:171
 msgid "_View"
 msgstr ""
 
-#: src/zentrale.rs:171
+#: src/zentrale.rs:176
 msgid "Search notifications"
 msgstr ""
 
-#: src/zentrale.rs:194
+#: src/zentrale.rs:199
 msgid ""
 "Show only critical notifications as pop-ups; all notifications are still collected here"
 msgstr ""
 
-#: src/zentrale.rs:204
+#: src/zentrale.rs:209
 msgid "C_lear All"
 msgstr ""
 
-#: src/zentrale.rs:206
+#: src/zentrale.rs:211
 msgid "Remove all notifications from the list"
 msgstr ""
 
-#: src/zentrale.rs:369
+#: src/zentrale.rs:378
 #, no-c-format
 msgid "Notifications: {anzahl} · Unread: {ungelesen}"
 msgstr ""
 
-#: src/zentrale.rs:377
+#: src/zentrale.rs:386
 msgid "No notifications"
 msgstr ""
 
-#: src/zentrale.rs:381
+#: src/zentrale.rs:390
 msgid "No notifications match the search"
 msgstr ""
 
-#: src/zentrale.rs:405
+#: src/zentrale.rs:414
 msgid "_Cancel"
 msgstr ""
 
-#: src/zentrale.rs:406
+#: src/zentrale.rs:415
 msgid "_Remove All"
 msgstr ""
 
-#: src/zentrale.rs:409
+#: src/zentrale.rs:418
 msgid "Remove all notifications?"
 msgstr ""
 
-#: src/zentrale.rs:410
+#: src/zentrale.rs:419
 msgid "The list will be empty. This cannot be undone."
 msgstr ""
 
-#: src/zentrale.rs:432
+#: src/zentrale.rs:441
 msgid "Other"
 msgstr ""
 
-#: src/zentrale.rs:444
+#: src/zentrale.rs:453
 #, no-c-format
 msgid "{anzahl} ({ungelesen} unread)"
 msgstr ""
 
-#: src/zentrale.rs:542
+#: src/zentrale.rs:551
 msgid "Mark as Read"
 msgstr ""
 
-#: src/zentrale.rs:547
+#: src/zentrale.rs:556
 msgid "Remove"
 msgstr ""
 
-#: src/zentrale.rs:549
+#: src/zentrale.rs:558
 msgid "Remove this notification (Delete)"
 msgstr ""
 
 #. TRANSLATORS: Zeit einer Mitteilung von gestern (strftime-Format).
-#: src/zentrale.rs:572
+#: src/zentrale.rs:581
 msgid "Yesterday, %H:%M"
 msgstr ""
 
 #. TRANSLATORS: Datum und Zeit einer älteren Mitteilung im laufenden Jahr (strftime-Format, nur Ziffern).
-#: src/zentrale.rs:576
+#: src/zentrale.rs:585
 msgid "%m/%d, %H:%M"
 msgstr ""
 
 #. TRANSLATORS: Datum und Zeit einer Mitteilung aus einem anderen Jahr.
-#: src/zentrale.rs:579
+#: src/zentrale.rs:588
 msgid "%m/%d/%Y, %H:%M"
 msgstr ""

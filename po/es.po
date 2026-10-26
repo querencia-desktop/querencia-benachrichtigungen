@@ -1,0 +1,171 @@
+# Querencia Benachrichtigungen: spanische Übersetzung.
+# Copyright (C) 2026 Querencia Desktop contributors
+# Diese Datei steht unter derselben Lizenz wie Querencia Benachrichtigungen (GPL-3.0-or-later).
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: querencia-benachrichtigungen\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: 2026-10-26 23:47+0100\n"
+"Last-Translator: Querencia Desktop contributors\n"
+"Language-Team: Español (Querencia)\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#. TRANSLATORS: Desktop-Datei, Schlüssel Name
+#. TRANSLATORS: Titel des Fensters und Name im Menü (Zubehör).
+#: data/org.querencia.Benachrichtigungen.desktop.in:12 src/main.rs:117 src/zentrale.rs:102
+msgid "Notification Center"
+msgstr "Centro de notificaciones"
+
+#. TRANSLATORS: Desktop-Datei, Schlüssel Comment
+#: data/org.querencia.Benachrichtigungen.desktop.in:13
+msgid "Show and manage recent notifications"
+msgstr "Ver y gestionar las notificaciones recientes"
+
+#. TRANSLATORS: Desktop-Datei, Schlüssel Keywords (Liste, Einträge mit ; trennen und abschließen)
+#: data/org.querencia.Benachrichtigungen.desktop.in:19
+msgid "Notifications;Messages;History;Do Not Disturb;"
+msgstr "Notificaciones;Mensajes;Historial;No molestar;"
+
+#: src/main.rs:106
+msgid ""
+"The notification center will be available after the next login. The running notification service is an older version."
+msgstr ""
+"El centro de notificaciones estará disponible a partir del próximo inicio de sesión. El servicio de notificaciones en ejecución es una versión anterior."
+
+#: src/main.rs:110
+#, no-c-format
+msgid ""
+"Another notification service is running ({name} {version}). The notification center is not available."
+msgstr ""
+"Se está ejecutando otro servicio de notificaciones ({name} {version}). El centro de notificaciones no está disponible."
+
+#: src/main.rs:119 src/zentrale.rs:157
+msgid "_Close"
+msgstr "_Cerrar"
+
+#. TRANSLATORS: Tooltip des Schließen-Knopfs oben rechts in jedem Popup.
+#: src/popups.rs:662
+msgid "Close"
+msgstr "Cerrar"
+
+#. TRANSLATORS: kleiner Hinweis unten rechts im Popup; ein Klick öffnet die Mitteilungszentrale, in der die Meldung gespeichert ist.
+#: src/popups.rs:710
+msgid "in the notification center"
+msgstr "en el centro"
+
+#: src/popups.rs:712
+msgid "Open the notification center"
+msgstr "Abrir el centro de notificaciones"
+
+#: src/zentrale.rs:149
+msgid "Mark All as _Read"
+msgstr "Marcar todas como _leídas"
+
+#: src/zentrale.rs:153
+msgid "_Clear All…"
+msgstr "_Quitar todas…"
+
+#: src/zentrale.rs:162
+msgid "_Notifications"
+msgstr "_Notificaciones"
+
+#: src/zentrale.rs:164
+msgid "_Find"
+msgstr "_Buscar"
+
+#: src/zentrale.rs:167 src/zentrale.rs:198
+msgid "Do Not _Disturb"
+msgstr "No _molestar"
+
+#: src/zentrale.rs:171
+msgid "_View"
+msgstr "_Ver"
+
+#: src/zentrale.rs:176
+msgid "Search notifications"
+msgstr "Buscar notificaciones"
+
+#: src/zentrale.rs:199
+msgid ""
+"Show only critical notifications as pop-ups; all notifications are still collected here"
+msgstr ""
+"Mostrar como emergentes solo las notificaciones críticas; todas las notificaciones se siguen recogiendo aquí"
+
+#: src/zentrale.rs:209
+msgid "C_lear All"
+msgstr "Quitar _todas"
+
+#: src/zentrale.rs:211
+msgid "Remove all notifications from the list"
+msgstr "Quitar todas las notificaciones de la lista"
+
+#: src/zentrale.rs:378
+#, no-c-format
+msgid "Notifications: {anzahl} · Unread: {ungelesen}"
+msgstr "Notificaciones: {anzahl} · No leídas: {ungelesen}"
+
+#: src/zentrale.rs:386
+msgid "No notifications"
+msgstr "No hay notificaciones"
+
+#: src/zentrale.rs:390
+msgid "No notifications match the search"
+msgstr "Ninguna notificación coincide con la búsqueda"
+
+#: src/zentrale.rs:414
+msgid "_Cancel"
+msgstr "_Cancelar"
+
+#: src/zentrale.rs:415
+msgid "_Remove All"
+msgstr "_Quitar todas"
+
+#: src/zentrale.rs:418
+msgid "Remove all notifications?"
+msgstr "¿Quitar todas las notificaciones?"
+
+#: src/zentrale.rs:419
+msgid "The list will be empty. This cannot be undone."
+msgstr "La lista quedará vacía. Esta acción no se puede deshacer."
+
+#: src/zentrale.rs:441
+msgid "Other"
+msgstr "Otras"
+
+#: src/zentrale.rs:453
+#, no-c-format
+msgid "{anzahl} ({ungelesen} unread)"
+msgstr "{anzahl} ({ungelesen} no leídas)"
+
+#: src/zentrale.rs:551
+msgid "Mark as Read"
+msgstr "Marcar como leída"
+
+#: src/zentrale.rs:556
+msgid "Remove"
+msgstr "Quitar"
+
+#: src/zentrale.rs:558
+msgid "Remove this notification (Delete)"
+msgstr "Quitar esta notificación (Supr)"
+
+#. TRANSLATORS: Zeit einer Mitteilung von gestern (strftime-Format).
+#: src/zentrale.rs:581
+msgid "Yesterday, %H:%M"
+msgstr "Ayer, %H:%M"
+
+#. TRANSLATORS: Datum und Zeit einer älteren Mitteilung im laufenden Jahr (strftime-Format, nur Ziffern).
+#: src/zentrale.rs:585
+msgid "%m/%d, %H:%M"
+msgstr "%d/%m, %H:%M"
+
+#. TRANSLATORS: Datum und Zeit einer Mitteilung aus einem anderen Jahr.
+#: src/zentrale.rs:588
+msgid "%m/%d/%Y, %H:%M"
+msgstr "%d/%m/%Y, %H:%M"

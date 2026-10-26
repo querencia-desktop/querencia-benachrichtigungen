@@ -1,5 +1,19 @@
 # Änderungen
 
+## 0.2.3 – 2026-10-26
+
+Italienisch, Spanisch, Französisch:
+
+- Neue Kataloge `po/it.po`, `po/es.po`, `po/fr.po` (je 34 Texte,
+  vollständig): Mitteilungszentrale (Menüs, Suche, Nicht stören, Alle
+  entfernen, Zeitangaben), Popup-Tooltip und -Hinweis, Hinweisfenster und
+  Starter (`Name[it]=Centro notifiche`, `Name[es]=Centro de notificaciones`,
+  `Name[fr]=Centre de notifications`). Begriffe nach der gemeinsamen
+  Querencia-Begriffstabelle; Zugriffstasten im Fenster und je Menü eindeutig.
+- Datum landesüblich (`26/10, 14:05`).
+- Prüfwerkzeug: `szenario-sprache.sh` und `szenario-zentrale.sh` kennen it/es/fr.
+- Sonst keine Änderung: Deutsch, Englisch, Dienst, Farben und Symbol wie 0.2.2.
+
 ## 0.2.2 – 2026-10-21
 
 Kontrast hell:
