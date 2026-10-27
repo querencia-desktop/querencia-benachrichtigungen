@@ -11,7 +11,8 @@ Anleitung auf <https://querencialinux.org>.
 *English summary:* A desktop notification daemon (org.freedesktop.Notifications
 1.2) with layer-shell popups, do-not-disturb and a notification centre with
 history. Part of Querencia Desktop, a classic GNOME-2-style desktop for
-Wayland. Alpha software; documentation is in German.
+Wayland. Alpha software; user interface in German, English, Italian, Spanish
+and French; documentation is in German.
 
 > **Alpha.** Eine Seite in den Einstellungen fehlt noch (Einstellungen über
 > die ini-Datei). Keine Sicherheits- oder Datenverlustgarantie.
