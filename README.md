@@ -101,8 +101,8 @@ Gestartet wird der Dienst vom labwc-Autostart der Querencia-Sitzung
 
 | | |
 |---|---|
-| Version | 0.2.2 (Tag `benachrichtigungen/0.2.2`; dunkle Darstellung seit 0.2.1, Nebenschrift hell mit WCAG AA) |
-| Letzte Prüfung | 21.10.2026: Unit-Tests einschließlich Kontrasttest hell und dunkel; isolierte GUI-Prüfung Popups und Zentrale hell und dunkel |
+| Version | 0.2.3 (Tag `benachrichtigungen/0.2.3`; Italienisch, Spanisch, Französisch); dunkle Darstellung seit 0.2.1, Nebenschrift hell mit WCAG AA) |
+| Letzte Prüfung | 26.10.2026 (0.2.3): 55 Unit-Tests, Clippy sauber, `i18n.py pruefen` und `msgfmt --check` für de/es/fr/it; isoliert 1024×768: Regression `szenario.sh` de 42 PASS, `szenario-sprache.sh` de/en/it/es/fr je 6 PASS, `szenario-zentrale.sh` de/en/it/es/fr je 47 PASS. 21.10.2026: Unit-Tests einschließlich Kontrasttest hell und dunkel; isolierte GUI-Prüfung Popups und Zentrale hell und dunkel |
 | Bekannte Lücken | siehe „Alpha“ und [docs/testing.md](docs/testing.md) |
 | Getestet auf | Ubuntu 26.04, labwc 0.9.8, GTK 4.22, gtk4-layer-shell 1.3, Rust 1.93 |
 | Nicht getestet | andere Compositoren und Distributionen, HiDPI, Mehrmonitor |
@@ -155,10 +155,11 @@ Fälle, Ablauf (auch die Zentrale: `szenario-zentrale.sh`) und Belege:
 
 Seit 0.1.2 sind die Texte, die der Dienst selbst zeigt, englisch im Code
 (msgid) und deutsch in `po/de.po` (GNU gettext, Muster Querencia Editor
-0.2.0). Das sind die Mitteilungszentrale, der Starter, der Hinweis und der
+0.2.0); seit 0.2.3 auch italienisch, spanisch und französisch (`po/it.po`,
+`po/es.po`, `po/fr.po`). Das sind die Mitteilungszentrale, der Starter, der Hinweis und der
 Tooltip „Close“/„Schließen“ im Popup. Betreff, Text und Aktionen kommen vom
 Absender. Die Sprache folgt `LANGUAGE`/`LANG` (die
-Sitzung setzt `LANGUAGE=de`); ohne deutschen Katalog erscheint Englisch.
+Sitzung setzt `LANGUAGE=de`); ohne passenden Katalog erscheint Englisch.
 Befehlszeile, `--hilfe`, Log, D-Bus-Fehlertexte und `GetServerInformation`
 („Querencia Benachrichtigungen“) bleiben unverändert.
 

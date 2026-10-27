@@ -13,6 +13,7 @@ ok() { echo "PASS $*" | tee -a "$R"; }
 nok() { echo "FAIL $*" | tee -a "$R"; }
 . "$(dirname "$0")/eingabe.sh"
 SPRACHE=${LANGUAGE%%:*}
+SPRACHE=${SPRACHE%%_*}
 GROESSE=${QB_GROESSE:-1024x768}
 AUSW=${GROESSE%x*}; AUSH=${GROESSE#*x}
 shot() { sleep "${2:-0.6}"; grim "$OUT/$1-$SPRACHE-$GROESSE.png"; }
@@ -36,7 +37,7 @@ grep -q "bereit: org.freedesktop.Notifications" "$LOG" && ok "Dienst bereit" || 
 KAT=$(grep -o '[^ ]*querencia-benachrichtigungen.mo' "/proc/$DIENST/maps" 2>/dev/null | head -1)
 echo "INFO Katalog: ${KAT:-keiner}" >>"$R"
 case $SPRACHE in
-de) [ -n "$KAT" ] && ok "de: Katalog eingeblendet" || nok "de: kein Katalog eingeblendet" ;;
+de | it | es | fr) [ -n "$KAT" ] && ok "$SPRACHE: Katalog eingeblendet" || nok "$SPRACHE: kein Katalog eingeblendet" ;;
 *) [ -z "$KAT" ] && ok "$SPRACHE: kein Katalog eingeblendet" || nok "$SPRACHE: Katalog eingeblendet" ;;
 esac
 

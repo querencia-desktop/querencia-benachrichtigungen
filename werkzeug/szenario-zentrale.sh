@@ -19,6 +19,7 @@ pruefe() { local t=$1; shift; if "$@"; then ok "$t"; else nok "$t"; fi; }
 BILD=$(dirname "$0")/bild.py
 MELDEN=$(dirname "$0")/melden.py
 SPRACHE=${LANGUAGE%%:*}
+SPRACHE=${SPRACHE%%_*}
 GROESSE=${QB_GROESSE:-1024x768}
 AUSW=${GROESSE%x*}; AUSH=${GROESSE#*x}
 S=$SPRACHE-$GROESSE
@@ -169,7 +170,7 @@ q "key Escape" "wait 600"
 
 # Zugriffstasten je Sprache: „_Nicht stören“/„Do Not _Disturb“,
 # „Alle _entfernen“/„C_lear All“.
-case $SPRACHE in de) T_NS=n; T_ALLE=e ;; *) T_NS=d; T_ALLE=l ;; esac
+case $SPRACHE in de) T_NS=n; T_ALLE=e ;; it) T_NS=d; T_ALLE=t ;; es) T_NS=m; T_ALLE=t ;; fr) T_NS=d; T_ALLE=t ;; *) T_NS=d; T_ALLE=l ;; esac
 
 # Z13 Nicht stören: per Eigenschaft und per Alt+N/Alt+D im Fenster; kritisch kommt durch
 qset NichtStoeren "<true>"; sleep 0.4

@@ -1005,7 +1005,7 @@ dependencies = [
 
 [[package]]
 name = "querencia-benachrichtigungen"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "gettext-rs",
  "glib-unix",
